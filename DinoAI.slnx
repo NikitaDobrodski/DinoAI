@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DinoAI.Cli/DinoAI.Cli.csproj" />
+    <Project Path="src/DinoAI.Core/DinoAI.Core.csproj" />
+    <Project Path="src/DinoAI.Server/DinoAI.Server.csproj" />
+    <Project Path="src/DinoAI.Web/DinoAI.Web.csproj" />
+  </Folder>
+</Solution>
