@@ -46,3 +46,16 @@ dotnet run --project src/DinoAI.Cli -- tools
 dotnet run --project src/DinoAI.Cli -- tool workspace.find_files D:\DinoAI pattern=*.csproj maxResults=20
 dotnet run --project src/DinoAI.Cli -- tool workspace.read_file D:\DinoAI path=README.md
 ```
+
+## Local agent runner
+
+DinoAI now has a deterministic local agent runner. It does not call an LLM yet; it plans simple workspace tool calls from commands or intent-like messages and writes user, tool, and assistant messages into the session.
+
+Try:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /workspace
+dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /files *.csproj
+dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /read README.md
+dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI show project files
+```

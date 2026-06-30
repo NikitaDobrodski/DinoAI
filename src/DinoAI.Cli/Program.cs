@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using DinoAI.Core.Agents;
 using DinoAI.Core.Sessions;
 using DinoAI.Core.Tools;
 using DinoAI.Core.Tools.Workspace;
@@ -12,6 +13,7 @@ var tools = new AgentToolRegistry(
     new FindWorkspaceFilesTool(workspace),
     new ReadWorkspaceFileTool(workspace)
 ]);
+var agent = new LocalAgentRunner(sessions, tools);
 
 var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
 {
@@ -34,6 +36,24 @@ if (args is ["demo"])
 
     Console.WriteLine($"Session: {session.Title} ({session.Id})");
     foreach (var message in session.Messages)
+    {
+        Console.WriteLine($"[{message.Role}] {message.Content}");
+    }
+
+    return;
+}
+
+if (args is ["ask", var askRoot, .. var messageParts])
+{
+    if (messageParts.Length == 0)
+    {
+        Console.WriteLine("Usage: dino ask <root> <message>");
+        return;
+    }
+
+    var session = await sessions.CreateAsync("CLI ask session");
+    var result = await agent.RunAsync(session.Id, askRoot, string.Join(' ', messageParts));
+    foreach (var message in result.Session.Messages)
     {
         Console.WriteLine($"[{message.Role}] {message.Content}");
     }
@@ -117,6 +137,7 @@ Console.WriteLine();
 Console.WriteLine("Usage:");
 Console.WriteLine("  dino new [title]");
 Console.WriteLine("  dino demo");
+Console.WriteLine("  dino ask <root> <message>");
 Console.WriteLine("  dino workspace [root]");
 Console.WriteLine("  dino files [root] [pattern]");
 Console.WriteLine("  dino read <root> <relative-path>");

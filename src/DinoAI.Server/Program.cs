@@ -1,4 +1,5 @@
-﻿using DinoAI.Core.Sessions;
+﻿using DinoAI.Core.Agents;
+using DinoAI.Core.Sessions;
 using DinoAI.Core.Tools;
 using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
@@ -11,6 +12,7 @@ builder.Services.AddSingleton<IAgentTool, DescribeWorkspaceTool>();
 builder.Services.AddSingleton<IAgentTool, FindWorkspaceFilesTool>();
 builder.Services.AddSingleton<IAgentTool, ReadWorkspaceFileTool>();
 builder.Services.AddSingleton<IAgentToolRegistry, AgentToolRegistry>();
+builder.Services.AddSingleton<IAgentRunner, LocalAgentRunner>();
 
 var app = builder.Build();
 
@@ -43,6 +45,32 @@ app.MapPost("/sessions/{sessionId:guid}/messages", async (
     {
         var session = await sessions.AddMessageAsync(sessionId, request.Role, request.Content, cancellationToken);
         return Results.Ok(session);
+    }
+    catch (KeyNotFoundException)
+    {
+        return Results.NotFound();
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/sessions/{sessionId:guid}/turn", async (
+    Guid sessionId,
+    RunTurnRequest request,
+    IAgentRunner agent,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await agent.RunAsync(
+            sessionId,
+            GetWorkspaceRoot(request.WorkspaceRoot),
+            request.Content,
+            cancellationToken);
+
+        return Results.Ok(result);
     }
     catch (KeyNotFoundException)
     {
@@ -129,11 +157,14 @@ app.Run();
 
 static string GetWorkspaceRoot(string? root)
 {
-    return string.IsNullOrWhiteSpace(root) ? Directory.GetCurrentDirectory() : root;
+    return string.IsNullOrWhiteSpace(root) ? WorkspaceRootResolver.Resolve(Directory.GetCurrentDirectory()) : root;
 }
 
 public sealed record CreateSessionRequest(string? Title);
 
 public sealed record AddMessageRequest(AgentMessageRole Role, string Content);
 
+public sealed record RunTurnRequest(string? WorkspaceRoot, string Content);
+
 public sealed record ExecuteToolRequest(string? WorkspaceRoot, Dictionary<string, string?>? Arguments);
+

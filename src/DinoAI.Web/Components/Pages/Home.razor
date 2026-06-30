@@ -1,9 +1,11 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@using DinoAI.Core.Agents
 @using DinoAI.Core.Sessions
 @using DinoAI.Core.Tools
 @using DinoAI.Core.Workspace
 @inject IAgentSessionStore Sessions
+@inject IAgentRunner Agent
 @inject IWorkspaceService Workspace
 @inject IAgentToolRegistry Tools
 
@@ -14,7 +16,7 @@
         <div>
             <p class="eyebrow">DinoAI Agent</p>
             <h1>Local C# AI coding workspace</h1>
-            <p class="summary">First vertical slice: sessions, messages, workspace inspection, and tool discovery are backed by DinoAI.Core.</p>
+            <p class="summary">Agent turns now flow through DinoAI.Core: session storage, local planning, workspace tools, and tool messages.</p>
         </div>
         <button class="primary" @onclick="CreateSessionAsync">New session</button>
     </header>
@@ -44,8 +46,10 @@
     </section>
 
     <div class="composer">
-        <input @bind="DraftMessage" @bind:event="oninput" placeholder="Send a first message to DinoAI" />
-        <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || string.IsNullOrWhiteSpace(DraftMessage))">Send</button>
+        <input @bind="DraftMessage" @bind:event="oninput" placeholder="Try: /workspace, /files *.csproj, /read README.md" />
+        <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || IsBusy || string.IsNullOrWhiteSpace(DraftMessage))">
+            @(IsBusy ? "Running..." : "Send")
+        </button>
     </div>
 
     @if (ActiveSession is null)
@@ -76,7 +80,9 @@
 
     private string DraftMessage { get; set; } = string.Empty;
 
-    private string WorkspaceRoot { get; set; } = Directory.GetCurrentDirectory();
+    private string WorkspaceRoot { get; set; } = WorkspaceRootResolver.Resolve(Directory.GetCurrentDirectory());
+
+    private bool IsBusy { get; set; }
 
     private IReadOnlyList<WorkspaceFile> ProjectFiles { get; set; } = [];
 
@@ -103,8 +109,19 @@
             return;
         }
 
-        ActiveSession = await Sessions.AddMessageAsync(ActiveSession.Id, AgentMessageRole.User, DraftMessage);
-        ActiveSession = await Sessions.AddMessageAsync(ActiveSession.Id, AgentMessageRole.Assistant, "Next step: connect this message loop to a model provider and tool planner.");
+        IsBusy = true;
+        var message = DraftMessage;
         DraftMessage = string.Empty;
+
+        try
+        {
+            var result = await Agent.RunAsync(ActiveSession.Id, WorkspaceRoot, message);
+            ActiveSession = result.Session;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 }
+

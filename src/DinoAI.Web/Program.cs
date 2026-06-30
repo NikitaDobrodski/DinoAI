@@ -1,4 +1,5 @@
-﻿using DinoAI.Core.Sessions;
+﻿using DinoAI.Core.Agents;
+using DinoAI.Core.Sessions;
 using DinoAI.Core.Tools;
 using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
@@ -12,6 +13,7 @@ builder.Services.AddSingleton<IAgentTool, DescribeWorkspaceTool>();
 builder.Services.AddSingleton<IAgentTool, FindWorkspaceFilesTool>();
 builder.Services.AddSingleton<IAgentTool, ReadWorkspaceFileTool>();
 builder.Services.AddSingleton<IAgentToolRegistry, AgentToolRegistry>();
+builder.Services.AddSingleton<IAgentRunner, LocalAgentRunner>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
