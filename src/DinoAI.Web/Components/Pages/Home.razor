@@ -1,5 +1,6 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@using System.Text.Json
 @using DinoAI.Core.Agents
 @using DinoAI.Core.Sessions
 @using DinoAI.Core.Tools
@@ -16,7 +17,7 @@
         <div>
             <p class="eyebrow">DinoAI Agent</p>
             <h1>Local C# AI coding workspace</h1>
-            <p class="summary">Agent turns now flow through DinoAI.Core: session storage, local planning, workspace tools, and tool messages.</p>
+            <p class="summary">Agent turns flow through DinoAI.Core: sessions, local planning, permissions, workspace tools, and shell checks.</p>
         </div>
         <button class="primary" @onclick="CreateSessionAsync">New session</button>
     </header>
@@ -36,17 +37,75 @@
     </section>
 
     <section class="tools-panel">
-        <p class="eyebrow">Tools</p>
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">Tools</p>
+                <h2>Manual Tool Execution</h2>
+            </div>
+            <span>@ToolDefinitions.Count tool(s)</span>
+        </div>
+
         <div class="tool-list">
             @foreach (var tool in ToolDefinitions)
             {
                 <span title="@tool.Description">@tool.Name</span>
             }
         </div>
+
+        <div class="tool-runner">
+            <label>
+                Tool
+                <select value="@SelectedToolName" @onchange="OnSelectedToolChanged">
+                    @foreach (var tool in ToolDefinitions)
+                    {
+                        <option value="@tool.Name">@tool.Name</option>
+                    }
+                </select>
+            </label>
+
+            <label>
+                Workspace root
+                <input @bind="WorkspaceRoot" @bind:event="oninput" />
+            </label>
+
+            <label class="approval-toggle">
+                <input type="checkbox" @bind="ToolApproved" />
+                Explicitly approve this tool call
+            </label>
+
+            @if (SelectedTool is not null)
+            {
+                <div class="tool-description">
+                    <strong>@SelectedTool.Name</strong>
+                    <span>@SelectedTool.Description</span>
+                </div>
+
+                <div class="parameter-list">
+                    @foreach (var parameter in SelectedTool.Parameters)
+                    {
+                        <span>@parameter.Name @(parameter.IsRequired ? "required" : $"default {parameter.DefaultValue}")</span>
+                    }
+                </div>
+            }
+
+            <label>
+                Arguments
+                <textarea @bind="ToolArgumentsText" @bind:event="oninput" rows="5" placeholder="key=value&#10;command=git status --short&#10;timeoutSeconds=30"></textarea>
+            </label>
+
+            <button class="primary" @onclick="ExecuteSelectedToolAsync" disabled="@(IsToolBusy || string.IsNullOrWhiteSpace(SelectedToolName))">
+                @(IsToolBusy ? "Running tool..." : "Run tool")
+            </button>
+
+            @if (!string.IsNullOrWhiteSpace(ToolResultJson))
+            {
+                <pre class="tool-result @(LastToolSucceeded ? "success" : "failure")">@ToolResultJson</pre>
+            }
+        </div>
     </section>
 
     <div class="composer">
-        <input @bind="DraftMessage" @bind:event="oninput" placeholder="Try: /workspace, /files *.csproj, /read README.md" />
+        <input @bind="DraftMessage" @bind:event="oninput" placeholder="Try: /workspace, /files *.csproj, /read README.md, /status, /build" />
         <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || IsBusy || string.IsNullOrWhiteSpace(DraftMessage))">
             @(IsBusy ? "Running..." : "Send")
         </button>
@@ -76,6 +135,11 @@
 </section>
 
 @code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+
     private AgentSession? ActiveSession { get; set; }
 
     private string DraftMessage { get; set; } = string.Empty;
@@ -84,9 +148,23 @@
 
     private bool IsBusy { get; set; }
 
+    private bool IsToolBusy { get; set; }
+
+    private bool ToolApproved { get; set; }
+
+    private bool LastToolSucceeded { get; set; }
+
+    private string SelectedToolName { get; set; } = string.Empty;
+
+    private string ToolArgumentsText { get; set; } = "command=git status --short";
+
+    private string? ToolResultJson { get; set; }
+
     private IReadOnlyList<WorkspaceFile> ProjectFiles { get; set; } = [];
 
     private IReadOnlyList<AgentToolDefinition> ToolDefinitions { get; set; } = [];
+
+    private AgentToolDefinition? SelectedTool => ToolDefinitions.FirstOrDefault(tool => tool.Name == SelectedToolName);
 
     protected override async Task OnInitializedAsync()
     {
@@ -94,6 +172,7 @@
         ActiveSession = sessions.FirstOrDefault() ?? await Sessions.CreateAsync("Blazor workspace session");
         ProjectFiles = await Workspace.FindFilesAsync(WorkspaceRoot, "*.csproj", 20);
         ToolDefinitions = Tools.List();
+        SelectedToolName = ToolDefinitions.FirstOrDefault()?.Name ?? string.Empty;
     }
 
     private async Task CreateSessionAsync()
@@ -123,5 +202,62 @@
             IsBusy = false;
         }
     }
-}
 
+    private void OnSelectedToolChanged(ChangeEventArgs args)
+    {
+        SelectedToolName = args.Value?.ToString() ?? string.Empty;
+        ToolApproved = false;
+        ToolResultJson = null;
+        ToolArgumentsText = SelectedToolName switch
+        {
+            "shell.run" => "command=git status --short",
+            "workspace.find_files" => "pattern=*.csproj\nmaxResults=20",
+            "workspace.read_file" => "path=README.md\nmaxBytes=4096",
+            "workspace.write_file" => "path=.tmp/ui-write-test.txt\ncontent=hello from DinoAI UI\noverwrite=true",
+            _ => string.Empty
+        };
+    }
+
+    private async Task ExecuteSelectedToolAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedToolName))
+        {
+            return;
+        }
+
+        IsToolBusy = true;
+        ToolResultJson = null;
+
+        try
+        {
+            var arguments = ParseArguments(ToolArgumentsText);
+            var result = await Tools.ExecuteAsync(
+                SelectedToolName,
+                new AgentToolContext(WorkspaceRoot, arguments, ToolApproved));
+
+            LastToolSucceeded = result.IsSuccess;
+            ToolResultJson = JsonSerializer.Serialize(result, JsonOptions);
+        }
+        finally
+        {
+            IsToolBusy = false;
+        }
+    }
+
+    private static IReadOnlyDictionary<string, string?> ParseArguments(string text)
+    {
+        var arguments = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rawLine in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var separator = rawLine.IndexOf('=');
+            if (separator <= 0)
+            {
+                continue;
+            }
+
+            arguments[rawLine[..separator].Trim()] = rawLine[(separator + 1)..].Trim();
+        }
+
+        return arguments;
+    }
+}
