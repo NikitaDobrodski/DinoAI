@@ -75,3 +75,15 @@ Example approved write:
 ```powershell
 dotnet run --project src/DinoAI.Cli -- tool workspace.write_file D:\DinoAI path=.tmp/permission-test.txt content=hello confirm=true overwrite=true
 ```
+
+## Shell tool
+
+DinoAI includes a permission-aware shell tool. A small allowlist can run without explicit approval: `dotnet build`, `dotnet test`, `dotnet --info`, `git status`, `git diff`, and `git log`. Other commands return `Permission Ask` unless called with `confirm=true`.
+
+Examples:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- tool shell.run D:\DinoAI command="git status --short"
+dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /status
+dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /build
+```

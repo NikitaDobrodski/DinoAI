@@ -1,4 +1,6 @@
-﻿namespace DinoAI.Core.Permissions;
+﻿using DinoAI.Core.Shell;
+
+namespace DinoAI.Core.Permissions;
 
 public sealed class DefaultToolPermissionService : IToolPermissionService
 {
@@ -15,15 +17,20 @@ public sealed class DefaultToolPermissionService : IToolPermissionService
             ToolPermissionAction.WriteWorkspace => new ToolPermissionResult(
                 ToolPermissionDecision.Ask,
                 "Workspace write operations require explicit approval."),
-            ToolPermissionAction.RunShell when request.IsUserApproved => new ToolPermissionResult(
+            ToolPermissionAction.RunShell when request.IsUserApproved || IsAllowlistedShellCommand(request.Target) => new ToolPermissionResult(
                 ToolPermissionDecision.Allow,
-                "Shell command was explicitly approved."),
+                "Shell command is approved or allowlisted."),
             ToolPermissionAction.RunShell => new ToolPermissionResult(
                 ToolPermissionDecision.Ask,
-                "Shell commands require explicit approval."),
+                "Shell commands require explicit approval unless they are allowlisted."),
             _ => new ToolPermissionResult(
                 ToolPermissionDecision.Deny,
                 "Unsupported permission action.")
         };
+    }
+
+    private static bool IsAllowlistedShellCommand(string? command)
+    {
+        return !string.IsNullOrWhiteSpace(command) && ShellCommandPolicy.IsAllowedWithoutApproval(command);
     }
 }

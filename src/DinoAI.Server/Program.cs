@@ -1,7 +1,9 @@
 ﻿using DinoAI.Core.Agents;
 using DinoAI.Core.Permissions;
 using DinoAI.Core.Sessions;
+using DinoAI.Core.Shell;
 using DinoAI.Core.Tools;
+using DinoAI.Core.Tools.Shell;
 using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
 
@@ -10,10 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<IAgentSessionStore, InMemoryAgentSessionStore>();
 builder.Services.AddSingleton<IWorkspaceService, FileSystemWorkspaceService>();
 builder.Services.AddSingleton<IToolPermissionService, DefaultToolPermissionService>();
+builder.Services.AddSingleton<IShellCommandRunner, ProcessShellCommandRunner>();
 builder.Services.AddSingleton<IAgentTool, DescribeWorkspaceTool>();
 builder.Services.AddSingleton<IAgentTool, FindWorkspaceFilesTool>();
 builder.Services.AddSingleton<IAgentTool, ReadWorkspaceFileTool>();
 builder.Services.AddSingleton<IAgentTool, WriteWorkspaceFileTool>();
+builder.Services.AddSingleton<IAgentTool, RunShellCommandTool>();
 builder.Services.AddSingleton<IAgentToolRegistry, AgentToolRegistry>();
 builder.Services.AddSingleton<IAgentRunner, LocalAgentRunner>();
 
@@ -170,6 +174,7 @@ public sealed record AddMessageRequest(AgentMessageRole Role, string Content);
 public sealed record RunTurnRequest(string? WorkspaceRoot, string Content);
 
 public sealed record ExecuteToolRequest(string? WorkspaceRoot, Dictionary<string, string?>? Arguments, bool IsUserApproved = false);
+
 
 
 

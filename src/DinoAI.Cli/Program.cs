@@ -2,19 +2,23 @@
 using DinoAI.Core.Agents;
 using DinoAI.Core.Permissions;
 using DinoAI.Core.Sessions;
+using DinoAI.Core.Shell;
 using DinoAI.Core.Tools;
+using DinoAI.Core.Tools.Shell;
 using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
 
 var sessions = new InMemoryAgentSessionStore();
 var workspace = new FileSystemWorkspaceService();
 var permissionService = new DefaultToolPermissionService();
+var shellRunner = new ProcessShellCommandRunner();
 var tools = new AgentToolRegistry(
 [
     new DescribeWorkspaceTool(workspace),
     new FindWorkspaceFilesTool(workspace),
     new ReadWorkspaceFileTool(workspace),
-    new WriteWorkspaceFileTool(workspace, permissionService)
+    new WriteWorkspaceFileTool(workspace, permissionService),
+    new RunShellCommandTool(shellRunner, permissionService)
 ]);
 var agent = new LocalAgentRunner(sessions, tools);
 
@@ -168,5 +172,6 @@ static IReadOnlyDictionary<string, string?> ParseArguments(string[] args)
 
     return arguments;
 }
+
 
 

@@ -1,4 +1,5 @@
 ﻿using DinoAI.Core.Sessions;
+using DinoAI.Core.Shell;
 using DinoAI.Core.Tools;
 using DinoAI.Core.Workspace;
 
@@ -28,7 +29,7 @@ public sealed class LocalAgentRunner(
             session = await sessions.AddMessageAsync(
                 sessionId,
                 AgentMessageRole.Assistant,
-                "I can inspect this workspace now. Try /workspace, /files *.csproj, /read README.md, or ask about project files.",
+                "I can inspect and check this workspace now. Try /workspace, /files *.csproj, /read README.md, /build, /status, or /diff.",
                 cancellationToken);
 
             return new AgentTurnResult(session, calls);
@@ -63,6 +64,40 @@ public sealed class LocalAgentRunner(
         var trimmed = userMessage.Trim();
         var lower = trimmed.ToLowerInvariant();
 
+        if (lower is "/build" or "build")
+        {
+            return [new ToolPlan("shell.run", new Dictionary<string, string?>
+            {
+                ["command"] = "dotnet build DinoAI.slnx",
+                ["timeoutSeconds"] = "120"
+            })];
+        }
+
+        if (lower is "/test" or "test")
+        {
+            return [new ToolPlan("shell.run", new Dictionary<string, string?>
+            {
+                ["command"] = "dotnet test DinoAI.slnx",
+                ["timeoutSeconds"] = "120"
+            })];
+        }
+
+        if (lower is "/status" or "status" or "git status")
+        {
+            return [new ToolPlan("shell.run", new Dictionary<string, string?>
+            {
+                ["command"] = "git status --short"
+            })];
+        }
+
+        if (lower is "/diff" or "diff" or "git diff")
+        {
+            return [new ToolPlan("shell.run", new Dictionary<string, string?>
+            {
+                ["command"] = "git diff --stat"
+            })];
+        }
+
         if (lower is "/workspace" or "workspace")
         {
             return [new ToolPlan("workspace.describe", new Dictionary<string, string?>())];
@@ -87,6 +122,15 @@ public sealed class LocalAgentRunner(
             {
                 ["path"] = trimmed["/read ".Length..].Trim(),
                 ["maxBytes"] = "8192"
+            })];
+        }
+
+        if (lower.Contains("build", StringComparison.Ordinal))
+        {
+            return [new ToolPlan("shell.run", new Dictionary<string, string?>
+            {
+                ["command"] = "dotnet build DinoAI.slnx",
+                ["timeoutSeconds"] = "120"
             })];
         }
 
@@ -129,6 +173,7 @@ public sealed class LocalAgentRunner(
             IReadOnlyList<WorkspaceFile> files => $"{toolName}: found {files.Count} file(s).",
             WorkspaceFileContent file => $"{toolName}: read {file.RelativePath} ({file.SizeBytes} bytes, truncated: {file.WasTruncated}).",
             WorkspaceWriteResult write => $"{toolName}: wrote {write.RelativePath} ({write.SizeBytes} bytes, created: {write.WasCreated}, overwritten: {write.WasOverwritten}).",
+            ShellCommandResult shell => $"{toolName}: exit {shell.ExitCode} in {shell.Duration.TotalSeconds:F1}s (timeout: {shell.TimedOut}).",
             _ => $"{toolName}: completed."
         };
     }
@@ -138,7 +183,7 @@ public sealed class LocalAgentRunner(
         var successfulCalls = calls.Where(call => call.Result.IsSuccess).ToArray();
         if (successfulCalls.Length == 0)
         {
-            return "I tried to inspect the workspace, but the tool call failed. Check the tool message above for details.";
+            return "I tried to use a tool, but the call failed. Check the tool message above for details.";
         }
 
         var last = successfulCalls[^1];
@@ -148,7 +193,8 @@ public sealed class LocalAgentRunner(
             IReadOnlyList<WorkspaceFile> files => FormatFiles(files),
             WorkspaceFileContent file => FormatFileContent(file),
             WorkspaceWriteResult write => $"I wrote {write.RelativePath} ({write.SizeBytes} bytes). Created: {write.WasCreated}. Overwritten: {write.WasOverwritten}.",
-            _ => "Done. I executed the planned workspace tool call."
+            ShellCommandResult shell => FormatShellResult(shell),
+            _ => "Done. I executed the planned tool call."
         };
     }
 
@@ -177,6 +223,17 @@ public sealed class LocalAgentRunner(
         return $"I found {files.Count} matching file(s):{Environment.NewLine}{preview}{suffix}";
     }
 
+    private static string FormatShellResult(ShellCommandResult result)
+    {
+        var output = string.IsNullOrWhiteSpace(result.StandardOutput)
+            ? result.StandardError
+            : result.StandardOutput;
+        var trimmed = output.Trim();
+        var preview = trimmed.Length > 2000 ? trimmed[..2000] + Environment.NewLine + "[truncated]" : trimmed;
+        return $"Command `{result.Command}` exited with code {result.ExitCode} in {result.Duration.TotalSeconds:F1}s." +
+               (string.IsNullOrWhiteSpace(preview) ? string.Empty : Environment.NewLine + preview);
+    }
+
     private static string FormatFileContent(WorkspaceFileContent file)
     {
         var suffix = file.WasTruncated ? Environment.NewLine + "[truncated]" : string.Empty;
@@ -185,4 +242,3 @@ public sealed class LocalAgentRunner(
 
     private sealed record ToolPlan(string ToolName, IReadOnlyDictionary<string, string?> Arguments);
 }
-
