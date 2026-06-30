@@ -58,3 +58,103 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+.dino-shell {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.dino-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.eyebrow {
+    margin: 0 0 .25rem;
+    color: #476582;
+    font-size: .85rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.dino-header h1 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+.summary,
+.empty,
+.session-id {
+    color: #5c6975;
+}
+
+.primary,
+.composer button {
+    border: 0;
+    border-radius: 8px;
+    background: #1f6feb;
+    color: white;
+    cursor: pointer;
+    font-weight: 700;
+    padding: .7rem 1rem;
+}
+
+.primary:hover,
+.composer button:hover {
+    background: #195ec7;
+}
+
+.composer {
+    display: flex;
+    gap: .75rem;
+    margin: 1rem 0 1.5rem;
+}
+
+.composer input {
+    flex: 1;
+    border: 1px solid #c8d0d8;
+    border-radius: 8px;
+    padding: .7rem .85rem;
+}
+
+.composer button:disabled {
+    background: #9ca8b3;
+    cursor: not-allowed;
+}
+
+.session {
+    border: 1px solid #d8dee4;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.session h2 {
+    margin: 0;
+}
+
+.messages {
+    display: grid;
+    gap: .75rem;
+    margin-top: 1rem;
+}
+
+.message {
+    display: grid;
+    gap: .2rem;
+    border-left: 4px solid #8c959f;
+    background: #f6f8fa;
+    border-radius: 8px;
+    padding: .75rem;
+}
+
+.message.assistant {
+    border-left-color: #1f6feb;
+}
+
+.message.user {
+    border-left-color: #2da44e;
+}

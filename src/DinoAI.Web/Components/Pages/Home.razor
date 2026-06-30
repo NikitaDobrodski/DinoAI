@@ -1,7 +1,74 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@using DinoAI.Core.Sessions
+@inject IAgentSessionStore Sessions
 
-<PageTitle>Home</PageTitle>
+<PageTitle>DinoAI</PageTitle>
 
-<h1>Hello, world!</h1>
+<section class="dino-shell">
+    <header class="dino-header">
+        <div>
+            <p class="eyebrow">DinoAI Agent</p>
+            <h1>Local C# AI coding workspace</h1>
+            <p class="summary">First vertical slice: sessions and messages are already backed by DinoAI.Core.</p>
+        </div>
+        <button class="primary" @onclick="CreateSessionAsync">New session</button>
+    </header>
 
-Welcome to your new app.
+    <div class="composer">
+        <input @bind="DraftMessage" @bind:event="oninput" placeholder="Send a first message to DinoAI" />
+        <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || string.IsNullOrWhiteSpace(DraftMessage))">Send</button>
+    </div>
+
+    @if (ActiveSession is null)
+    {
+        <p class="empty">Create a session to start the workspace loop.</p>
+    }
+    else
+    {
+        <article class="session">
+            <h2>@ActiveSession.Title</h2>
+            <p class="session-id">@ActiveSession.Id</p>
+
+            <div class="messages">
+                @foreach (var message in ActiveSession.Messages)
+                {
+                    <div class="message @message.Role.ToString().ToLowerInvariant()">
+                        <strong>@message.Role</strong>
+                        <span>@message.Content</span>
+                    </div>
+                }
+            </div>
+        </article>
+    }
+</section>
+
+@code {
+    private AgentSession? ActiveSession { get; set; }
+
+    private string DraftMessage { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var sessions = await Sessions.ListAsync();
+        ActiveSession = sessions.FirstOrDefault() ?? await Sessions.CreateAsync("Blazor workspace session");
+    }
+
+    private async Task CreateSessionAsync()
+    {
+        ActiveSession = await Sessions.CreateAsync("Blazor workspace session");
+        DraftMessage = string.Empty;
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (ActiveSession is null || string.IsNullOrWhiteSpace(DraftMessage))
+        {
+            return;
+        }
+
+        ActiveSession = await Sessions.AddMessageAsync(ActiveSession.Id, AgentMessageRole.User, DraftMessage);
+        ActiveSession = await Sessions.AddMessageAsync(ActiveSession.Id, AgentMessageRole.Assistant, "Next step: connect this message loop to a model provider and tool planner.");
+        DraftMessage = string.Empty;
+    }
+}
