@@ -18,3 +18,15 @@ Build the first useful loop:
 3. Agent proposes or applies a patch.
 4. Agent runs checks.
 5. User reviews the result and diff.
+
+## Workspace tools
+
+DinoAI.Core now includes a guarded filesystem workspace service. It can describe a root, find files by pattern, and read files by relative path while blocking paths that escape the workspace root.
+
+CLI examples:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- workspace D:\DinoAI
+dotnet run --project src/DinoAI.Cli -- files D:\DinoAI *.csproj
+dotnet run --project src/DinoAI.Cli -- read D:\DinoAI README.md
+```

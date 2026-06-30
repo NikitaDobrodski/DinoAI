@@ -1,7 +1,9 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @using DinoAI.Core.Sessions
+@using DinoAI.Core.Workspace
 @inject IAgentSessionStore Sessions
+@inject IWorkspaceService Workspace
 
 <PageTitle>DinoAI</PageTitle>
 
@@ -10,10 +12,24 @@
         <div>
             <p class="eyebrow">DinoAI Agent</p>
             <h1>Local C# AI coding workspace</h1>
-            <p class="summary">First vertical slice: sessions and messages are already backed by DinoAI.Core.</p>
+            <p class="summary">First vertical slice: sessions, messages, and workspace inspection are backed by DinoAI.Core.</p>
         </div>
         <button class="primary" @onclick="CreateSessionAsync">New session</button>
     </header>
+
+    <section class="workspace-panel">
+        <div>
+            <p class="eyebrow">Workspace</p>
+            <h2>@WorkspaceRoot</h2>
+            <p class="summary">Found @ProjectFiles.Count project file(s) outside ignored folders.</p>
+        </div>
+        <div class="project-list">
+            @foreach (var file in ProjectFiles)
+            {
+                <span>@file.RelativePath</span>
+            }
+        </div>
+    </section>
 
     <div class="composer">
         <input @bind="DraftMessage" @bind:event="oninput" placeholder="Send a first message to DinoAI" />
@@ -48,10 +64,15 @@
 
     private string DraftMessage { get; set; } = string.Empty;
 
+    private string WorkspaceRoot { get; set; } = Directory.GetCurrentDirectory();
+
+    private IReadOnlyList<WorkspaceFile> ProjectFiles { get; set; } = [];
+
     protected override async Task OnInitializedAsync()
     {
         var sessions = await Sessions.ListAsync();
         ActiveSession = sessions.FirstOrDefault() ?? await Sessions.CreateAsync("Blazor workspace session");
+        ProjectFiles = await Workspace.FindFilesAsync(WorkspaceRoot, "*.csproj", 20);
     }
 
     private async Task CreateSessionAsync()

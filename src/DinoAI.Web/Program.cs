@@ -1,9 +1,11 @@
 ﻿using DinoAI.Core.Sessions;
+using DinoAI.Core.Workspace;
 using DinoAI.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<IAgentSessionStore, InMemoryAgentSessionStore>();
+builder.Services.AddSingleton<IWorkspaceService, FileSystemWorkspaceService>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

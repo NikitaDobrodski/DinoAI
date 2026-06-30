@@ -158,3 +158,34 @@ h1:focus {
 .message.user {
     border-left-color: #2da44e;
 }
+
+.workspace-panel {
+    display: grid;
+    gap: 1rem;
+    border: 1px solid #d8dee4;
+    border-radius: 8px;
+    background: #ffffff;
+    margin-bottom: 1rem;
+    padding: 1rem;
+}
+
+.workspace-panel h2 {
+    overflow-wrap: anywhere;
+    font-size: 1rem;
+    margin: 0;
+}
+
+.project-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.project-list span {
+    border: 1px solid #d8dee4;
+    border-radius: 999px;
+    background: #f6f8fa;
+    color: #24292f;
+    font-size: .85rem;
+    padding: .35rem .6rem;
+}
