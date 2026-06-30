@@ -189,3 +189,27 @@ h1:focus {
     font-size: .85rem;
     padding: .35rem .6rem;
 }
+
+.tools-panel {
+    border: 1px solid #d8dee4;
+    border-radius: 8px;
+    background: #ffffff;
+    margin-bottom: 1rem;
+    padding: 1rem;
+}
+
+.tool-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.tool-list span {
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: .85rem;
+    padding: .35rem .55rem;
+}

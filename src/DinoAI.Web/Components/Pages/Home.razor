@@ -1,9 +1,11 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @using DinoAI.Core.Sessions
+@using DinoAI.Core.Tools
 @using DinoAI.Core.Workspace
 @inject IAgentSessionStore Sessions
 @inject IWorkspaceService Workspace
+@inject IAgentToolRegistry Tools
 
 <PageTitle>DinoAI</PageTitle>
 
@@ -12,7 +14,7 @@
         <div>
             <p class="eyebrow">DinoAI Agent</p>
             <h1>Local C# AI coding workspace</h1>
-            <p class="summary">First vertical slice: sessions, messages, and workspace inspection are backed by DinoAI.Core.</p>
+            <p class="summary">First vertical slice: sessions, messages, workspace inspection, and tool discovery are backed by DinoAI.Core.</p>
         </div>
         <button class="primary" @onclick="CreateSessionAsync">New session</button>
     </header>
@@ -27,6 +29,16 @@
             @foreach (var file in ProjectFiles)
             {
                 <span>@file.RelativePath</span>
+            }
+        </div>
+    </section>
+
+    <section class="tools-panel">
+        <p class="eyebrow">Tools</p>
+        <div class="tool-list">
+            @foreach (var tool in ToolDefinitions)
+            {
+                <span title="@tool.Description">@tool.Name</span>
             }
         </div>
     </section>
@@ -68,11 +80,14 @@
 
     private IReadOnlyList<WorkspaceFile> ProjectFiles { get; set; } = [];
 
+    private IReadOnlyList<AgentToolDefinition> ToolDefinitions { get; set; } = [];
+
     protected override async Task OnInitializedAsync()
     {
         var sessions = await Sessions.ListAsync();
         ActiveSession = sessions.FirstOrDefault() ?? await Sessions.CreateAsync("Blazor workspace session");
         ProjectFiles = await Workspace.FindFilesAsync(WorkspaceRoot, "*.csproj", 20);
+        ToolDefinitions = Tools.List();
     }
 
     private async Task CreateSessionAsync()

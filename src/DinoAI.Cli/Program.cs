@@ -1,8 +1,22 @@
-﻿using DinoAI.Core.Sessions;
+﻿using System.Text.Json;
+using DinoAI.Core.Sessions;
+using DinoAI.Core.Tools;
+using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
 
 var sessions = new InMemoryAgentSessionStore();
 var workspace = new FileSystemWorkspaceService();
+var tools = new AgentToolRegistry(
+[
+    new DescribeWorkspaceTool(workspace),
+    new FindWorkspaceFilesTool(workspace),
+    new ReadWorkspaceFileTool(workspace)
+]);
+
+var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+{
+    WriteIndented = true
+};
 
 if (args is ["new", .. var titleParts])
 {
@@ -75,6 +89,29 @@ if (args is ["read", var readRoot, var path])
     return;
 }
 
+if (args is ["tools"])
+{
+    foreach (var tool in tools.List())
+    {
+        Console.WriteLine($"{tool.Name} - {tool.Description}");
+        foreach (var parameter in tool.Parameters)
+        {
+            var required = parameter.IsRequired ? "required" : $"default={parameter.DefaultValue}";
+            Console.WriteLine($"  {parameter.Name}: {parameter.Description} ({required})");
+        }
+    }
+
+    return;
+}
+
+if (args is ["tool", var toolName, var toolRoot, .. var toolArgs])
+{
+    var arguments = ParseArguments(toolArgs);
+    var result = await tools.ExecuteAsync(toolName, new AgentToolContext(toolRoot, arguments));
+    Console.WriteLine(JsonSerializer.Serialize(result, jsonOptions));
+    return;
+}
+
 Console.WriteLine("DinoAI CLI");
 Console.WriteLine();
 Console.WriteLine("Usage:");
@@ -83,9 +120,27 @@ Console.WriteLine("  dino demo");
 Console.WriteLine("  dino workspace [root]");
 Console.WriteLine("  dino files [root] [pattern]");
 Console.WriteLine("  dino read <root> <relative-path>");
+Console.WriteLine("  dino tools");
+Console.WriteLine("  dino tool <name> <root> [key=value ...]");
 
 static string GetRoot(string[] rootParts)
 {
     return rootParts.Length == 0 ? Directory.GetCurrentDirectory() : string.Join(' ', rootParts);
 }
 
+static IReadOnlyDictionary<string, string?> ParseArguments(string[] args)
+{
+    var arguments = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    foreach (var arg in args)
+    {
+        var separator = arg.IndexOf('=');
+        if (separator <= 0)
+        {
+            continue;
+        }
+
+        arguments[arg[..separator]] = arg[(separator + 1)..];
+    }
+
+    return arguments;
+}

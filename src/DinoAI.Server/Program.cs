@@ -1,10 +1,16 @@
 ﻿using DinoAI.Core.Sessions;
+using DinoAI.Core.Tools;
+using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<IAgentSessionStore, InMemoryAgentSessionStore>();
 builder.Services.AddSingleton<IWorkspaceService, FileSystemWorkspaceService>();
+builder.Services.AddSingleton<IAgentTool, DescribeWorkspaceTool>();
+builder.Services.AddSingleton<IAgentTool, FindWorkspaceFilesTool>();
+builder.Services.AddSingleton<IAgentTool, ReadWorkspaceFileTool>();
+builder.Services.AddSingleton<IAgentToolRegistry, AgentToolRegistry>();
 
 var app = builder.Build();
 
@@ -103,6 +109,22 @@ app.MapGet("/workspace/file", async (
     }
 });
 
+app.MapGet("/tools", (IAgentToolRegistry tools) => Results.Ok(tools.List()));
+
+app.MapPost("/tools/{toolName}/execute", async (
+    string toolName,
+    ExecuteToolRequest request,
+    IAgentToolRegistry tools,
+    CancellationToken cancellationToken) =>
+{
+    var context = new AgentToolContext(
+        GetWorkspaceRoot(request.WorkspaceRoot),
+        request.Arguments ?? new Dictionary<string, string?>());
+
+    var result = await tools.ExecuteAsync(toolName, context, cancellationToken);
+    return result.IsSuccess ? Results.Ok(result) : Results.BadRequest(result);
+});
+
 app.Run();
 
 static string GetWorkspaceRoot(string? root)
@@ -113,3 +135,5 @@ static string GetWorkspaceRoot(string? root)
 public sealed record CreateSessionRequest(string? Title);
 
 public sealed record AddMessageRequest(AgentMessageRole Role, string Content);
+
+public sealed record ExecuteToolRequest(string? WorkspaceRoot, Dictionary<string, string?>? Arguments);

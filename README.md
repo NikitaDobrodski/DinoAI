@@ -30,3 +30,19 @@ dotnet run --project src/DinoAI.Cli -- workspace D:\DinoAI
 dotnet run --project src/DinoAI.Cli -- files D:\DinoAI *.csproj
 dotnet run --project src/DinoAI.Cli -- read D:\DinoAI README.md
 ```
+
+## Tool registry
+
+Workspace operations are also exposed as agent tools:
+
+- `workspace.describe`
+- `workspace.find_files`
+- `workspace.read_file`
+
+CLI examples:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- tools
+dotnet run --project src/DinoAI.Cli -- tool workspace.find_files D:\DinoAI pattern=*.csproj maxResults=20
+dotnet run --project src/DinoAI.Cli -- tool workspace.read_file D:\DinoAI path=README.md
+```
