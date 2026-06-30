@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using DinoAI.Core.Agents;
+using DinoAI.Core.Permissions;
 using DinoAI.Core.Sessions;
 using DinoAI.Core.Tools;
 using DinoAI.Core.Tools.Workspace;
@@ -7,11 +8,13 @@ using DinoAI.Core.Workspace;
 
 var sessions = new InMemoryAgentSessionStore();
 var workspace = new FileSystemWorkspaceService();
+var permissionService = new DefaultToolPermissionService();
 var tools = new AgentToolRegistry(
 [
     new DescribeWorkspaceTool(workspace),
     new FindWorkspaceFilesTool(workspace),
-    new ReadWorkspaceFileTool(workspace)
+    new ReadWorkspaceFileTool(workspace),
+    new WriteWorkspaceFileTool(workspace, permissionService)
 ]);
 var agent = new LocalAgentRunner(sessions, tools);
 
@@ -127,7 +130,7 @@ if (args is ["tools"])
 if (args is ["tool", var toolName, var toolRoot, .. var toolArgs])
 {
     var arguments = ParseArguments(toolArgs);
-    var result = await tools.ExecuteAsync(toolName, new AgentToolContext(toolRoot, arguments));
+    var result = await tools.ExecuteAsync(toolName, new AgentToolContext(toolRoot, arguments, arguments.GetBoolean("confirm", false)));
     Console.WriteLine(JsonSerializer.Serialize(result, jsonOptions));
     return;
 }
@@ -165,3 +168,5 @@ static IReadOnlyDictionary<string, string?> ParseArguments(string[] args)
 
     return arguments;
 }
+
+

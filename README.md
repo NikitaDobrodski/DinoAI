@@ -59,3 +59,19 @@ dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /files *.csproj
 dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /read README.md
 dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI show project files
 ```
+
+## Permissions and writes
+
+DinoAI has a first permission layer. Read-only workspace tools are allowed by default. Workspace writes require explicit approval.
+
+Example blocked write:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- tool workspace.write_file D:\DinoAI path=.tmp/permission-test.txt content=hello
+```
+
+Example approved write:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- tool workspace.write_file D:\DinoAI path=.tmp/permission-test.txt content=hello confirm=true overwrite=true
+```

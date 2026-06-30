@@ -128,6 +128,7 @@ public sealed class LocalAgentRunner(
             WorkspaceInfo info => $"{toolName}: {info.TopLevelDirectories.Count} directories, {info.TopLevelFiles.Count} files at {info.RootPath}.",
             IReadOnlyList<WorkspaceFile> files => $"{toolName}: found {files.Count} file(s).",
             WorkspaceFileContent file => $"{toolName}: read {file.RelativePath} ({file.SizeBytes} bytes, truncated: {file.WasTruncated}).",
+            WorkspaceWriteResult write => $"{toolName}: wrote {write.RelativePath} ({write.SizeBytes} bytes, created: {write.WasCreated}, overwritten: {write.WasOverwritten}).",
             _ => $"{toolName}: completed."
         };
     }
@@ -146,6 +147,7 @@ public sealed class LocalAgentRunner(
             WorkspaceInfo info => FormatWorkspaceInfo(info),
             IReadOnlyList<WorkspaceFile> files => FormatFiles(files),
             WorkspaceFileContent file => FormatFileContent(file),
+            WorkspaceWriteResult write => $"I wrote {write.RelativePath} ({write.SizeBytes} bytes). Created: {write.WasCreated}. Overwritten: {write.WasOverwritten}.",
             _ => "Done. I executed the planned workspace tool call."
         };
     }
@@ -183,3 +185,4 @@ public sealed class LocalAgentRunner(
 
     private sealed record ToolPlan(string ToolName, IReadOnlyDictionary<string, string?> Arguments);
 }
+

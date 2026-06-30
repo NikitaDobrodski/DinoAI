@@ -24,4 +24,17 @@ public static class AgentToolArguments
 
         return int.TryParse(value, out var parsed) ? parsed : defaultValue;
     }
+
+    public static bool GetBoolean(
+        this IReadOnlyDictionary<string, string?> arguments,
+        string name,
+        bool defaultValue)
+    {
+        if (!arguments.TryGetValue(name, out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            return defaultValue;
+        }
+
+        return bool.TryParse(value, out var parsed) ? parsed : defaultValue;
+    }
 }

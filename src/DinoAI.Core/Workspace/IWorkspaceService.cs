@@ -15,4 +15,11 @@ public interface IWorkspaceService
         string relativePath,
         int maxBytes = 64 * 1024,
         CancellationToken cancellationToken = default);
+
+    Task<WorkspaceWriteResult> WriteFileAsync(
+        string rootPath,
+        string relativePath,
+        string content,
+        bool overwrite = false,
+        CancellationToken cancellationToken = default);
 }

@@ -94,6 +94,32 @@ public sealed class FileSystemWorkspaceService : IWorkspaceService
         return new WorkspaceFileContent(ToRelativePath(root, filePath), content, info.Length, info.Length > safeMaxBytes);
     }
 
+
+    public async Task<WorkspaceWriteResult> WriteFileAsync(
+        string rootPath,
+        string relativePath,
+        string content,
+        bool overwrite = false,
+        CancellationToken cancellationToken = default)
+    {
+        var root = NormalizeExistingRoot(rootPath);
+        var filePath = ResolveInsideRoot(root, relativePath);
+        var existed = File.Exists(filePath);
+        if (existed && !overwrite)
+        {
+            throw new IOException("Workspace file already exists. Pass overwrite=true to replace it.");
+        }
+
+        var directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await File.WriteAllTextAsync(filePath, content, Encoding.UTF8, cancellationToken);
+        var info = new FileInfo(filePath);
+        return new WorkspaceWriteResult(ToRelativePath(root, filePath), info.Length, !existed, existed);
+    }
     private static string NormalizeExistingRoot(string rootPath)
     {
         var root = NormalizeRoot(rootPath);
@@ -150,3 +176,4 @@ public sealed class FileSystemWorkspaceService : IWorkspaceService
         return Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
     }
 }
+
