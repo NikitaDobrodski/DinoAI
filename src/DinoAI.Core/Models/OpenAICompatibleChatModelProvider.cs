@@ -6,17 +6,18 @@ namespace DinoAI.Core.Models;
 
 public sealed class OpenAICompatibleChatModelProvider(
     HttpClient httpClient,
-    OpenAICompatibleChatModelOptions options) : IChatModelProvider
+    IChatModelSettingsStore settingsStore) : IChatModelProvider
 {
     public ChatModelProviderStatus GetStatus()
     {
+        var options = settingsStore.Current;
         if (string.IsNullOrWhiteSpace(options.ApiKey))
         {
             return new ChatModelProviderStatus(
                 "OpenAI-compatible",
                 false,
                 options.Model,
-                "Укажи DINOAI_OPENAI_API_KEY, чтобы включить ответы через модель.");
+                "Укажи API key в настройках модели, чтобы включить ответы через ИИ.");
         }
 
         return new ChatModelProviderStatus("OpenAI-compatible", true, options.Model, null);
@@ -26,6 +27,7 @@ public sealed class OpenAICompatibleChatModelProvider(
         ChatModelRequest request,
         CancellationToken cancellationToken = default)
     {
+        var options = await settingsStore.GetAsync(cancellationToken);
         var status = GetStatus();
         if (!status.IsConfigured)
         {
@@ -69,4 +71,3 @@ public sealed class OpenAICompatibleChatModelProvider(
     private sealed record ChatCompletionChoice(
         [property: JsonPropertyName("message")] ChatCompletionMessage? Message);
 }
-

@@ -10,12 +10,15 @@ using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
 
 var workspaceRoot = ResolveInitialWorkspaceRoot(args);
-var sessionStorePath = Path.Combine(workspaceRoot, ".dinoai", "sessions.json");
+var dinoStateRoot = Path.Combine(workspaceRoot, ".dinoai");
+var sessionStorePath = Path.Combine(dinoStateRoot, "sessions.json");
+var modelSettingsPath = Path.Combine(dinoStateRoot, "model-settings.json");
 var sessions = new FileAgentSessionStore(sessionStorePath);
 var workspace = new FileSystemWorkspaceService();
 var permissionService = new DefaultToolPermissionService();
 var shellRunner = new ProcessShellCommandRunner();
-var modelProvider = new OpenAICompatibleChatModelProvider(new HttpClient(), OpenAICompatibleChatModelOptions.FromEnvironment());
+var modelSettings = new FileChatModelSettingsStore(modelSettingsPath);
+var modelProvider = new OpenAICompatibleChatModelProvider(new HttpClient(), modelSettings);
 var tools = new AgentToolRegistry(
 [
     new DescribeWorkspaceTool(workspace),
@@ -197,4 +200,5 @@ static string ResolveInitialWorkspaceRoot(string[] args)
 
     return WorkspaceRootResolver.Resolve(root);
 }
+
 

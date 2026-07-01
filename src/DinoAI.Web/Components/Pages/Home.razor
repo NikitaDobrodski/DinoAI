@@ -9,6 +9,7 @@
 @inject IAgentSessionStore Sessions
 @inject IAgentRunner Agent
 @inject IChatModelProvider ModelProvider
+@inject IChatModelSettingsStore ModelSettings
 @inject IWorkspaceService Workspace
 @inject IAgentToolRegistry Tools
 
@@ -68,12 +69,45 @@
         </section>
 
         <section class="model-panel">
-            <div>
-                <p class="eyebrow">Модель</p>
-                <h2>@ModelStatus.ProviderName</h2>
-                <p class="summary">@(ModelStatus.IsConfigured ? $"Подключена модель {ModelStatus.Model}" : ModelStatus.Reason)</p>
+            <div class="model-summary">
+                <div>
+                    <p class="eyebrow">Модель</p>
+                    <h2>@ModelStatus.ProviderName</h2>
+                    <p class="summary">@(ModelStatus.IsConfigured ? $"Подключена модель {ModelStatus.Model}" : ModelStatus.Reason)</p>
+                </div>
+                <span class="model-state @(ModelStatus.IsConfigured ? "ready" : "missing")">@(ModelStatus.IsConfigured ? "готово" : "не настроено")</span>
             </div>
-            <span class="model-state @(ModelStatus.IsConfigured ? "ready" : "missing")">@(ModelStatus.IsConfigured ? "готово" : "не настроено")</span>
+
+            <div class="model-settings-form">
+                <label>
+                    Base URL
+                    <input @bind="ModelBaseUrl" @bind:event="oninput" placeholder="https://api.deepseek.com/v1" />
+                </label>
+
+                <label>
+                    Модель
+                    <input @bind="ModelName" @bind:event="oninput" placeholder="deepseek-chat" />
+                </label>
+
+                <label>
+                    API key
+                    <input type="password" @bind="ModelApiKey" @bind:event="oninput" placeholder="sk-..." autocomplete="off" />
+                </label>
+
+                <div class="model-actions">
+                    <button class="primary" @onclick="SaveModelSettingsAsync" disabled="@IsModelSettingsBusy">
+                        @(IsModelSettingsBusy ? "Сохраняю..." : "Сохранить настройки")
+                    </button>
+                    <button class="secondary" @onclick="TestModelSettingsAsync" disabled="@(IsModelSettingsBusy || !ModelStatus.IsConfigured)">
+                        Проверить подключение
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(ModelSettingsMessage))
+                {
+                    <p class="settings-message @(LastModelSettingsSucceeded ? "success" : "failure")">@ModelSettingsMessage</p>
+                }
+            </div>
         </section>
 
         <section class="tools-panel">
@@ -201,6 +235,18 @@
 
     private string? ToolResultJson { get; set; }
 
+    private string ModelBaseUrl { get; set; } = string.Empty;
+
+    private string ModelApiKey { get; set; } = string.Empty;
+
+    private string ModelName { get; set; } = string.Empty;
+
+    private string? ModelSettingsMessage { get; set; }
+
+    private bool IsModelSettingsBusy { get; set; }
+
+    private bool LastModelSettingsSucceeded { get; set; }
+
     private ChatModelProviderStatus ModelStatus { get; set; } = ChatModelProviderStatus.NotConfigured("OpenAI-compatible", "Модель еще не проверена.");
 
     private IReadOnlyList<AgentSession> SessionList { get; set; } = [];
@@ -213,7 +259,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        ModelStatus = ModelProvider.GetStatus();
+        await LoadModelSettingsAsync();
         await RefreshSessionsAsync();
         ActiveSession = SessionList.FirstOrDefault() ?? await Sessions.CreateAsync("Сессия DinoAI");
         await RefreshSessionsAsync();
@@ -222,6 +268,65 @@
         SelectedToolName = ToolDefinitions.FirstOrDefault()?.Name ?? string.Empty;
     }
 
+    private async Task LoadModelSettingsAsync()
+    {
+        var options = await ModelSettings.GetAsync();
+        ModelBaseUrl = options.BaseUrl;
+        ModelApiKey = options.ApiKey ?? string.Empty;
+        ModelName = options.Model;
+        ModelStatus = ModelProvider.GetStatus();
+    }
+
+    private async Task SaveModelSettingsAsync()
+    {
+        IsModelSettingsBusy = true;
+        ModelSettingsMessage = null;
+
+        try
+        {
+            await ModelSettings.SaveAsync(new OpenAICompatibleChatModelOptions(ModelBaseUrl, ModelApiKey, ModelName));
+            ModelStatus = ModelProvider.GetStatus();
+            LastModelSettingsSucceeded = true;
+            ModelSettingsMessage = "Настройки модели сохранены.";
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            LastModelSettingsSucceeded = false;
+            ModelSettingsMessage = $"Не удалось сохранить настройки: {ex.Message}";
+        }
+        finally
+        {
+            IsModelSettingsBusy = false;
+        }
+    }
+
+    private async Task TestModelSettingsAsync()
+    {
+        IsModelSettingsBusy = true;
+        ModelSettingsMessage = null;
+
+        try
+        {
+            var response = await ModelProvider.CompleteAsync(new ChatModelRequest([
+                new ChatModelMessage("system", "Ты проверяешь подключение DinoAI к модели. Ответь одним коротким русским предложением."),
+                new ChatModelMessage("user", "Проверка подключения.")
+            ], Temperature: 0));
+
+            ModelStatus = ModelProvider.GetStatus();
+            LastModelSettingsSucceeded = true;
+            ModelSettingsMessage = $"Подключение работает: {response.Content}";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TaskCanceledException)
+        {
+            ModelStatus = ModelProvider.GetStatus();
+            LastModelSettingsSucceeded = false;
+            ModelSettingsMessage = $"Проверка не прошла: {ex.Message}";
+        }
+        finally
+        {
+            IsModelSettingsBusy = false;
+        }
+    }
     private async Task RefreshSessionsAsync()
     {
         SessionList = await Sessions.ListAsync();
@@ -342,4 +447,6 @@
         };
     }
 }
+
+
 

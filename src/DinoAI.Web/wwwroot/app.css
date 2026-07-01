@@ -480,3 +480,74 @@ h1:focus {
     right: 1rem;
 }
 
+
+.model-summary {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.model-settings-form {
+    border-top: 1px solid #d8dee4;
+    display: grid;
+    gap: .85rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+}
+
+.model-settings-form label {
+    color: #374151;
+    display: grid;
+    gap: .35rem;
+    font-weight: 700;
+}
+
+.model-settings-form input {
+    border: 1px solid #c8d0d8;
+    border-radius: 8px;
+    color: #24292f;
+    font: inherit;
+    font-weight: 400;
+    padding: .65rem .75rem;
+}
+
+.model-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+}
+
+.secondary {
+    border: 1px solid #d8dee4;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #24292f;
+    cursor: pointer;
+    font-weight: 700;
+    padding: .75rem 1rem;
+}
+
+.secondary:disabled {
+    cursor: not-allowed;
+    opacity: .6;
+}
+
+.settings-message {
+    border-radius: 8px;
+    margin: 0;
+    padding: .7rem .8rem;
+}
+
+.settings-message.success {
+    background: #ecfdf3;
+    border: 1px solid #abefc6;
+    color: #05603a;
+}
+
+.settings-message.failure {
+    background: #fff1f3;
+    border: 1px solid #fecdd6;
+    color: #9f1239;
+}
+

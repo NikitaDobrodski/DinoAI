@@ -11,10 +11,12 @@ using DinoAI.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 var workspaceRoot = WorkspaceRootResolver.Resolve(Directory.GetCurrentDirectory());
-var sessionStorePath = Path.Combine(workspaceRoot, ".dinoai", "sessions.json");
+var dinoStateRoot = Path.Combine(workspaceRoot, ".dinoai");
+var sessionStorePath = Path.Combine(dinoStateRoot, "sessions.json");
+var modelSettingsPath = Path.Combine(dinoStateRoot, "model-settings.json");
 
 builder.Services.AddHttpClient();
-builder.Services.AddSingleton(OpenAICompatibleChatModelOptions.FromEnvironment());
+builder.Services.AddSingleton<IChatModelSettingsStore>(_ => new FileChatModelSettingsStore(modelSettingsPath));
 builder.Services.AddSingleton<IChatModelProvider, OpenAICompatibleChatModelProvider>();
 builder.Services.AddSingleton<IAgentSessionStore>(_ => new FileAgentSessionStore(sessionStorePath));
 builder.Services.AddSingleton<IWorkspaceService, FileSystemWorkspaceService>();
@@ -47,6 +49,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
 
 
 
