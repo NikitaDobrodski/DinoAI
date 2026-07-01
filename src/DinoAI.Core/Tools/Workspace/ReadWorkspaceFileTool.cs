@@ -6,10 +6,10 @@ public sealed class ReadWorkspaceFileTool(IWorkspaceService workspace) : IAgentT
 {
     public AgentToolDefinition Definition { get; } = new(
         "workspace.read_file",
-        "Read a UTF-8 text file by relative path inside the workspace root.",
+        "Прочитать UTF-8 текстовый файл по относительному пути внутри рабочей папки.",
         [
-            new AgentToolParameter("path", "Relative file path inside the workspace root.", true),
-            new AgentToolParameter("maxBytes", "Maximum bytes to read before truncating.", false, "65536")
+            new AgentToolParameter("path", "Относительный путь к файлу внутри рабочей папки.", true),
+            new AgentToolParameter("maxBytes", "Максимум байт для чтения до обрезки результата.", false, "65536")
         ]);
 
     public async Task<AgentToolResult> ExecuteAsync(AgentToolContext context, CancellationToken cancellationToken = default)
@@ -27,3 +27,4 @@ public sealed class ReadWorkspaceFileTool(IWorkspaceService workspace) : IAgentT
         }
     }
 }
+

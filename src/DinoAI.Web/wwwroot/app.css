@@ -1,4 +1,4 @@
-html, body {
+﻿html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
@@ -43,7 +43,7 @@ h1:focus {
 }
 
     .blazor-error-boundary::after {
-        content: "An error has occurred."
+        content: "Произошла ошибка."
     }
 
 .darker-border-checkbox.form-check-input {
@@ -425,3 +425,58 @@ h1:focus {
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
 }
+
+.model-panel {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid #d8dee4;
+    border-radius: 8px;
+    background: #ffffff;
+    margin-bottom: 1rem;
+    padding: 1rem;
+}
+
+.model-panel h2 {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.model-state {
+    border-radius: 999px;
+    font-size: .82rem;
+    font-weight: 700;
+    padding: .35rem .6rem;
+    white-space: nowrap;
+}
+
+.model-state.ready {
+    background: #ecfdf3;
+    color: #05603a;
+}
+
+.model-state.missing {
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+#blazor-error-ui {
+    background: #fff1f3;
+    border-top: 1px solid #fecdd6;
+    bottom: 0;
+    box-shadow: 0 -2px 8px rgba(15, 23, 42, .08);
+    display: none;
+    left: 0;
+    padding: .8rem 1rem;
+    position: fixed;
+    right: 0;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 1rem;
+}
+

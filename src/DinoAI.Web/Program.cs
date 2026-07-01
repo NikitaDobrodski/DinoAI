@@ -1,4 +1,5 @@
 ﻿using DinoAI.Core.Agents;
+using DinoAI.Core.Models;
 using DinoAI.Core.Permissions;
 using DinoAI.Core.Sessions;
 using DinoAI.Core.Shell;
@@ -12,6 +13,9 @@ var builder = WebApplication.CreateBuilder(args);
 var workspaceRoot = WorkspaceRootResolver.Resolve(Directory.GetCurrentDirectory());
 var sessionStorePath = Path.Combine(workspaceRoot, ".dinoai", "sessions.json");
 
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton(OpenAICompatibleChatModelOptions.FromEnvironment());
+builder.Services.AddSingleton<IChatModelProvider, OpenAICompatibleChatModelProvider>();
 builder.Services.AddSingleton<IAgentSessionStore>(_ => new FileAgentSessionStore(sessionStorePath));
 builder.Services.AddSingleton<IWorkspaceService, FileSystemWorkspaceService>();
 builder.Services.AddSingleton<IToolPermissionService, DefaultToolPermissionService>();
@@ -43,6 +47,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
 
 
 

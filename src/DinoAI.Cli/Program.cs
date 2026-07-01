@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using DinoAI.Core.Agents;
+using DinoAI.Core.Models;
 using DinoAI.Core.Permissions;
 using DinoAI.Core.Sessions;
 using DinoAI.Core.Shell;
@@ -14,6 +15,7 @@ var sessions = new FileAgentSessionStore(sessionStorePath);
 var workspace = new FileSystemWorkspaceService();
 var permissionService = new DefaultToolPermissionService();
 var shellRunner = new ProcessShellCommandRunner();
+var modelProvider = new OpenAICompatibleChatModelProvider(new HttpClient(), OpenAICompatibleChatModelOptions.FromEnvironment());
 var tools = new AgentToolRegistry(
 [
     new DescribeWorkspaceTool(workspace),
@@ -22,7 +24,7 @@ var tools = new AgentToolRegistry(
     new WriteWorkspaceFileTool(workspace, permissionService),
     new RunShellCommandTool(shellRunner, permissionService)
 ]);
-var agent = new LocalAgentRunner(sessions, tools);
+var agent = new LocalAgentRunner(sessions, tools, modelProvider);
 
 var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
 {
@@ -195,3 +197,4 @@ static string ResolveInitialWorkspaceRoot(string[] args)
 
     return WorkspaceRootResolver.Resolve(root);
 }
+

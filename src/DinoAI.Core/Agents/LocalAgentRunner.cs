@@ -1,4 +1,5 @@
-﻿using DinoAI.Core.Sessions;
+﻿using DinoAI.Core.Models;
+using DinoAI.Core.Sessions;
 using DinoAI.Core.Shell;
 using DinoAI.Core.Tools;
 using DinoAI.Core.Workspace;
@@ -7,7 +8,8 @@ namespace DinoAI.Core.Agents;
 
 public sealed class LocalAgentRunner(
     IAgentSessionStore sessions,
-    IAgentToolRegistry tools) : IAgentRunner
+    IAgentToolRegistry tools,
+    IChatModelProvider modelProvider) : IAgentRunner
 {
     public async Task<AgentTurnResult> RunAsync(
         Guid sessionId,
@@ -26,11 +28,7 @@ public sealed class LocalAgentRunner(
 
         if (plans.Count == 0)
         {
-            session = await sessions.AddMessageAsync(
-                sessionId,
-                AgentMessageRole.Assistant,
-                "I can inspect and check this workspace now. Try /workspace, /files *.csproj, /read README.md, /build, /status, or /diff.",
-                cancellationToken);
+            session = await CompleteWithModelAsync(sessionId, session, cancellationToken);
 
             return new AgentTurnResult(session, calls);
         }
@@ -57,6 +55,54 @@ public sealed class LocalAgentRunner(
             cancellationToken);
 
         return new AgentTurnResult(session, calls);
+    }
+
+    private async Task<AgentSession> CompleteWithModelAsync(
+        Guid sessionId,
+        AgentSession session,
+        CancellationToken cancellationToken)
+    {
+        var status = modelProvider.GetStatus();
+        if (!status.IsConfigured)
+        {
+            return await sessions.AddMessageAsync(
+                sessionId,
+                AgentMessageRole.Assistant,
+                "Провайдер модели пока не настроен. Я всё равно могу проверять workspace локальными командами: попробуй /workspace, /files *.csproj, /read README.md, /build, /status или /diff. Для DeepSeek/OpenRouter и других OpenAI-compatible API задай DINOAI_OPENAI_BASE_URL, DINOAI_OPENAI_API_KEY и DINOAI_OPENAI_MODEL.",
+                cancellationToken);
+        }
+
+        try
+        {
+            var messages = session.Messages
+                .Where(message => message.Role is AgentMessageRole.User or AgentMessageRole.Assistant or AgentMessageRole.System)
+                .TakeLast(20)
+                .Select(message => new ChatModelMessage(ToModelRole(message.Role), message.Content))
+                .Prepend(new ChatModelMessage("system", "Ты DinoAI, локальный C# coding agent. Отвечай кратко и практично. Если нужен доступ к файлам или shell, предлагай безопасные команды workspace-инструментов."))
+                .ToArray();
+
+            var response = await modelProvider.CompleteAsync(new ChatModelRequest(messages), cancellationToken);
+            return await sessions.AddMessageAsync(sessionId, AgentMessageRole.Assistant, response.Content, cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TaskCanceledException)
+        {
+            return await sessions.AddMessageAsync(
+                sessionId,
+                AgentMessageRole.Assistant,
+                $"Запрос к модели не удался: {ex.Message}",
+                cancellationToken);
+        }
+    }
+
+    private static string ToModelRole(AgentMessageRole role)
+    {
+        return role switch
+        {
+            AgentMessageRole.User => "user",
+            AgentMessageRole.Assistant => "assistant",
+            AgentMessageRole.System => "system",
+            _ => "user"
+        };
     }
 
     private static IReadOnlyList<ToolPlan> Plan(string userMessage)
@@ -164,16 +210,16 @@ public sealed class LocalAgentRunner(
     {
         if (!result.IsSuccess)
         {
-            return $"{toolName} failed: {result.Error}";
+            return $"{toolName}: ошибка: {result.Error}";
         }
 
         return result.Data switch
         {
             WorkspaceInfo info => $"{toolName}: {info.TopLevelDirectories.Count} directories, {info.TopLevelFiles.Count} files at {info.RootPath}.",
-            IReadOnlyList<WorkspaceFile> files => $"{toolName}: found {files.Count} file(s).",
-            WorkspaceFileContent file => $"{toolName}: read {file.RelativePath} ({file.SizeBytes} bytes, truncated: {file.WasTruncated}).",
-            WorkspaceWriteResult write => $"{toolName}: wrote {write.RelativePath} ({write.SizeBytes} bytes, created: {write.WasCreated}, overwritten: {write.WasOverwritten}).",
-            ShellCommandResult shell => $"{toolName}: exit {shell.ExitCode} in {shell.Duration.TotalSeconds:F1}s (timeout: {shell.TimedOut}).",
+            IReadOnlyList<WorkspaceFile> files => $"{toolName}: найдено файлов: {files.Count}.",
+            WorkspaceFileContent file => $"{toolName}: прочитан файл {file.RelativePath} ({file.SizeBytes} байт, обрезан: {file.WasTruncated}).",
+            WorkspaceWriteResult write => $"{toolName}: записан файл {write.RelativePath} ({write.SizeBytes} байт, создан: {write.WasCreated}, перезаписан: {write.WasOverwritten}).",
+            ShellCommandResult shell => $"{toolName}: код выхода {shell.ExitCode}, время {shell.Duration.TotalSeconds:F1}с, таймаут: {shell.TimedOut}.",
             _ => $"{toolName}: completed."
         };
     }
@@ -183,7 +229,7 @@ public sealed class LocalAgentRunner(
         var successfulCalls = calls.Where(call => call.Result.IsSuccess).ToArray();
         if (successfulCalls.Length == 0)
         {
-            return "I tried to use a tool, but the call failed. Check the tool message above for details.";
+            return "Я попытался выполнить инструмент, но вызов завершился ошибкой. Подробности выше в сообщении инструмента.";
         }
 
         var last = successfulCalls[^1];
@@ -192,7 +238,7 @@ public sealed class LocalAgentRunner(
             WorkspaceInfo info => FormatWorkspaceInfo(info),
             IReadOnlyList<WorkspaceFile> files => FormatFiles(files),
             WorkspaceFileContent file => FormatFileContent(file),
-            WorkspaceWriteResult write => $"I wrote {write.RelativePath} ({write.SizeBytes} bytes). Created: {write.WasCreated}. Overwritten: {write.WasOverwritten}.",
+            WorkspaceWriteResult write => $"Я записал {write.RelativePath} ({write.SizeBytes} байт). Создан: {write.WasCreated}. Перезаписан: {write.WasOverwritten}.",
             ShellCommandResult shell => FormatShellResult(shell),
             _ => "Done. I executed the planned tool call."
         };
@@ -215,7 +261,7 @@ public sealed class LocalAgentRunner(
     {
         if (files.Count == 0)
         {
-            return "I did not find matching files in this workspace.";
+            return "Я не нашёл подходящих файлов в этом workspace.";
         }
 
         var preview = string.Join(Environment.NewLine, files.Take(12).Select(file => $"- {file.RelativePath} ({file.SizeBytes} bytes)"));
@@ -230,7 +276,7 @@ public sealed class LocalAgentRunner(
             : result.StandardOutput;
         var trimmed = output.Trim();
         var preview = trimmed.Length > 2000 ? trimmed[..2000] + Environment.NewLine + "[truncated]" : trimmed;
-        return $"Command `{result.Command}` exited with code {result.ExitCode} in {result.Duration.TotalSeconds:F1}s." +
+        return $"Команда `{result.Command}` завершилась с кодом {result.ExitCode} за {result.Duration.TotalSeconds:F1}с." +
                (string.IsNullOrWhiteSpace(preview) ? string.Empty : Environment.NewLine + preview);
     }
 
@@ -242,3 +288,6 @@ public sealed class LocalAgentRunner(
 
     private sealed record ToolPlan(string ToolName, IReadOnlyDictionary<string, string?> Arguments);
 }
+
+
+

@@ -2,11 +2,13 @@
 @rendermode InteractiveServer
 @using System.Text.Json
 @using DinoAI.Core.Agents
+@using DinoAI.Core.Models
 @using DinoAI.Core.Sessions
 @using DinoAI.Core.Tools
 @using DinoAI.Core.Workspace
 @inject IAgentSessionStore Sessions
 @inject IAgentRunner Agent
+@inject IChatModelProvider ModelProvider
 @inject IWorkspaceService Workspace
 @inject IAgentToolRegistry Tools
 
@@ -16,24 +18,24 @@
     <aside class="session-sidebar">
         <div class="sidebar-heading">
             <div>
-                <p class="eyebrow">Sessions</p>
+                <p class="eyebrow">Сессии</p>
                 <h2>DinoAI</h2>
             </div>
-            <button class="icon-button" title="New session" @onclick="CreateSessionAsync">+</button>
+            <button class="icon-button" title="Новая сессия" @onclick="CreateSessionAsync">+</button>
         </div>
 
         <div class="session-list">
             @if (SessionList.Count == 0)
             {
-                <p class="empty small">No sessions yet.</p>
+                <p class="empty small">Сессий пока нет.</p>
             }
             else
             {
                 @foreach (var session in SessionList)
                 {
                     <button class="session-tab @(ActiveSession?.Id == session.Id ? "active" : null)" @onclick="() => SelectSessionAsync(session.Id)">
-                        <strong>@session.Title</strong>
-                        <span>@session.Messages.Count message(s)</span>
+                        <strong>@GetSessionTitle(session)</strong>
+                        <span>@session.Messages.Count сообщ.</span>
                         <time>@session.UpdatedAt.LocalDateTime.ToString("g")</time>
                     </button>
                 }
@@ -45,17 +47,17 @@
         <header class="dino-header">
             <div>
                 <p class="eyebrow">DinoAI Agent</p>
-                <h1>Local C# AI coding workspace</h1>
-                <p class="summary">Agent turns flow through DinoAI.Core: sessions, local planning, permissions, workspace tools, and shell checks.</p>
+                <h1>Локальная C#-среда для AI-разработки</h1>
+                <p class="summary">DinoAI управляет сессиями, локальными инструментами, разрешениями и проверками workspace.</p>
             </div>
-            <button class="primary" @onclick="CreateSessionAsync">New session</button>
+            <button class="primary" @onclick="CreateSessionAsync">Новая сессия</button>
         </header>
 
         <section class="workspace-panel">
             <div>
-                <p class="eyebrow">Workspace</p>
+                <p class="eyebrow">Рабочая папка</p>
                 <h2>@WorkspaceRoot</h2>
-                <p class="summary">Found @ProjectFiles.Count project file(s) outside ignored folders.</p>
+                <p class="summary">Найдено файлов проектов: @ProjectFiles.Count.</p>
             </div>
             <div class="project-list">
                 @foreach (var file in ProjectFiles)
@@ -65,13 +67,22 @@
             </div>
         </section>
 
+        <section class="model-panel">
+            <div>
+                <p class="eyebrow">Модель</p>
+                <h2>@ModelStatus.ProviderName</h2>
+                <p class="summary">@(ModelStatus.IsConfigured ? $"Подключена модель {ModelStatus.Model}" : ModelStatus.Reason)</p>
+            </div>
+            <span class="model-state @(ModelStatus.IsConfigured ? "ready" : "missing")">@(ModelStatus.IsConfigured ? "готово" : "не настроено")</span>
+        </section>
+
         <section class="tools-panel">
             <div class="panel-heading">
                 <div>
-                    <p class="eyebrow">Tools</p>
-                    <h2>Manual Tool Execution</h2>
+                    <p class="eyebrow">Инструменты</p>
+                    <h2>Ручной запуск инструмента</h2>
                 </div>
-                <span>@ToolDefinitions.Count tool(s)</span>
+                <span>@ToolDefinitions.Count инстр.</span>
             </div>
 
             <div class="tool-list">
@@ -83,7 +94,7 @@
 
             <div class="tool-runner">
                 <label>
-                    Tool
+                    Инструмент
                     <select value="@SelectedToolName" @onchange="OnSelectedToolChanged">
                         @foreach (var tool in ToolDefinitions)
                         {
@@ -93,13 +104,13 @@
                 </label>
 
                 <label>
-                    Workspace root
+                    Корень workspace
                     <input @bind="WorkspaceRoot" @bind:event="oninput" />
                 </label>
 
                 <label class="approval-toggle">
                     <input type="checkbox" @bind="ToolApproved" />
-                    Explicitly approve this tool call
+                    Явно разрешить этот вызов инструмента
                 </label>
 
                 @if (SelectedTool is not null)
@@ -112,18 +123,18 @@
                     <div class="parameter-list">
                         @foreach (var parameter in SelectedTool.Parameters)
                         {
-                            <span>@parameter.Name @(parameter.IsRequired ? "required" : $"default {parameter.DefaultValue}")</span>
+                            <span>@parameter.Name @(parameter.IsRequired ? "обяз." : $"по умолч. {parameter.DefaultValue}")</span>
                         }
                     </div>
                 }
 
                 <label>
-                    Arguments
+                    Аргументы
                     <textarea @bind="ToolArgumentsText" @bind:event="oninput" rows="5" placeholder="key=value&#10;command=git status --short&#10;timeoutSeconds=30"></textarea>
                 </label>
 
                 <button class="primary" @onclick="ExecuteSelectedToolAsync" disabled="@(IsToolBusy || string.IsNullOrWhiteSpace(SelectedToolName))">
-                    @(IsToolBusy ? "Running tool..." : "Run tool")
+                    @(IsToolBusy ? "Инструмент выполняется..." : "Запустить инструмент")
                 </button>
 
                 @if (!string.IsNullOrWhiteSpace(ToolResultJson))
@@ -134,27 +145,27 @@
         </section>
 
         <div class="composer">
-            <input @bind="DraftMessage" @bind:event="oninput" placeholder="Try: /workspace, /files *.csproj, /read README.md, /status, /build" />
+            <input @bind="DraftMessage" @bind:event="oninput" placeholder="Попробуй: /workspace, /files *.csproj, /read README.md, /status, /build" />
             <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || IsBusy || string.IsNullOrWhiteSpace(DraftMessage))">
-                @(IsBusy ? "Running..." : "Send")
+                @(IsBusy ? "Выполняется..." : "Отправить")
             </button>
         </div>
 
         @if (ActiveSession is null)
         {
-            <p class="empty">Create a session to start the workspace loop.</p>
+            <p class="empty">Создай сессию, чтобы начать работу с workspace.</p>
         }
         else
         {
             <article class="session">
-                <h2>@ActiveSession.Title</h2>
+                <h2>@GetSessionTitle(ActiveSession)</h2>
                 <p class="session-id">@ActiveSession.Id</p>
 
                 <div class="messages">
                     @foreach (var message in ActiveSession.Messages)
                     {
                         <div class="message @message.Role.ToString().ToLowerInvariant()">
-                            <strong>@message.Role</strong>
+                            <strong>@GetRoleLabel(message.Role)</strong>
                             <span>@message.Content</span>
                         </div>
                     }
@@ -190,6 +201,8 @@
 
     private string? ToolResultJson { get; set; }
 
+    private ChatModelProviderStatus ModelStatus { get; set; } = ChatModelProviderStatus.NotConfigured("OpenAI-compatible", "Модель еще не проверена.");
+
     private IReadOnlyList<AgentSession> SessionList { get; set; } = [];
 
     private IReadOnlyList<WorkspaceFile> ProjectFiles { get; set; } = [];
@@ -200,8 +213,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        ModelStatus = ModelProvider.GetStatus();
         await RefreshSessionsAsync();
-        ActiveSession = SessionList.FirstOrDefault() ?? await Sessions.CreateAsync("Blazor workspace session");
+        ActiveSession = SessionList.FirstOrDefault() ?? await Sessions.CreateAsync("Сессия DinoAI");
         await RefreshSessionsAsync();
         ProjectFiles = await Workspace.FindFilesAsync(WorkspaceRoot, "*.csproj", 20);
         ToolDefinitions = Tools.List();
@@ -215,7 +229,7 @@
 
     private async Task CreateSessionAsync()
     {
-        ActiveSession = await Sessions.CreateAsync("Blazor workspace session");
+        ActiveSession = await Sessions.CreateAsync("Сессия DinoAI");
         DraftMessage = string.Empty;
         await RefreshSessionsAsync();
     }
@@ -306,4 +320,26 @@
 
         return arguments;
     }
+
+    private static string GetSessionTitle(AgentSession session)
+    {
+        return session.Title switch
+        {
+            "Blazor workspace session" => "Сессия DinoAI",
+            "CLI ask session" => "CLI-сессия",
+            _ => session.Title
+        };
+    }
+    private static string GetRoleLabel(AgentMessageRole role)
+    {
+        return role switch
+        {
+            AgentMessageRole.User => "Пользователь",
+            AgentMessageRole.Assistant => "Ассистент",
+            AgentMessageRole.Tool => "Инструмент",
+            AgentMessageRole.System => "Система",
+            _ => role.ToString()
+        };
+    }
 }
+

@@ -9,12 +9,12 @@ public sealed class WriteWorkspaceFileTool(
 {
     public AgentToolDefinition Definition { get; } = new(
         "workspace.write_file",
-        "Write a UTF-8 text file inside the workspace root. Requires explicit approval.",
+        "Записать UTF-8 текстовый файл внутри рабочей папки. Требует явного разрешения.",
         [
-            new AgentToolParameter("path", "Relative file path inside the workspace root.", true),
-            new AgentToolParameter("content", "Text content to write.", true),
-            new AgentToolParameter("overwrite", "Whether an existing file may be replaced.", false, "false"),
-            new AgentToolParameter("confirm", "Set to true to explicitly approve this write operation.", false, "false")
+            new AgentToolParameter("path", "Относительный путь к файлу внутри рабочей папки.", true),
+            new AgentToolParameter("content", "Текст для записи в файл.", true),
+            new AgentToolParameter("overwrite", "Можно ли заменить существующий файл.", false, "false"),
+            new AgentToolParameter("confirm", "Установи true, чтобы явно разрешить запись.", false, "false")
         ]);
 
     public async Task<AgentToolResult> ExecuteAsync(AgentToolContext context, CancellationToken cancellationToken = default)
@@ -46,3 +46,4 @@ public sealed class WriteWorkspaceFileTool(
         }
     }
 }
+

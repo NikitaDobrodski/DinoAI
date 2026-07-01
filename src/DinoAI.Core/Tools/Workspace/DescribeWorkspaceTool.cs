@@ -6,7 +6,7 @@ public sealed class DescribeWorkspaceTool(IWorkspaceService workspace) : IAgentT
 {
     public AgentToolDefinition Definition { get; } = new(
         "workspace.describe",
-        "Describe the workspace root with top-level directories and files.",
+        "Показать рабочую папку: верхнеуровневые каталоги и файлы.",
         []);
 
     public async Task<AgentToolResult> ExecuteAsync(AgentToolContext context, CancellationToken cancellationToken = default)
@@ -21,3 +21,4 @@ public sealed class DescribeWorkspaceTool(IWorkspaceService workspace) : IAgentT
         }
     }
 }
+

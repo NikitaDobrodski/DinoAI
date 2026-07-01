@@ -9,11 +9,11 @@ public sealed class RunShellCommandTool(
 {
     public AgentToolDefinition Definition { get; } = new(
         "shell.run",
-        "Run an allowlisted shell command in the workspace root. Other commands require explicit approval.",
+        "Запустить разрешенную shell-команду в рабочей папке. Остальные команды требуют явного разрешения.",
         [
-            new AgentToolParameter("command", "Command to run in the workspace root.", true),
-            new AgentToolParameter("timeoutSeconds", "Maximum command runtime in seconds.", false, "60"),
-            new AgentToolParameter("confirm", "Set to true to explicitly approve non-allowlisted commands.", false, "false")
+            new AgentToolParameter("command", "Команда для запуска в рабочей папке.", true),
+            new AgentToolParameter("timeoutSeconds", "Максимальное время выполнения команды в секундах.", false, "60"),
+            new AgentToolParameter("confirm", "Установи true, чтобы явно разрешить команду вне allowlist.", false, "false")
         ]);
 
     public async Task<AgentToolResult> ExecuteAsync(AgentToolContext context, CancellationToken cancellationToken = default)
@@ -29,7 +29,7 @@ public sealed class RunShellCommandTool(
 
         if (!permission.IsAllowed)
         {
-            return AgentToolResult.Failure($"Permission {permission.Decision}: {permission.Reason}");
+            return AgentToolResult.Failure($"Разрешение {permission.Decision}: {permission.Reason}");
         }
 
         try
@@ -44,3 +44,4 @@ public sealed class RunShellCommandTool(
         }
     }
 }
+

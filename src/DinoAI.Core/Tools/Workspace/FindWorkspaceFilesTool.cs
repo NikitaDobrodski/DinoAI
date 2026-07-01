@@ -6,10 +6,10 @@ public sealed class FindWorkspaceFilesTool(IWorkspaceService workspace) : IAgent
 {
     public AgentToolDefinition Definition { get; } = new(
         "workspace.find_files",
-        "Find files in the workspace by search pattern while ignoring build and tool folders.",
+        "Найти файлы в рабочей папке по шаблону, пропуская build- и tool-каталоги.",
         [
-            new AgentToolParameter("pattern", "File search pattern, for example *.cs or *.csproj.", false, "*"),
-            new AgentToolParameter("maxResults", "Maximum number of files to return.", false, "200")
+            new AgentToolParameter("pattern", "Шаблон поиска файлов, например *.cs или *.csproj.", false, "*"),
+            new AgentToolParameter("maxResults", "Максимальное число файлов в результате.", false, "200")
         ]);
 
     public async Task<AgentToolResult> ExecuteAsync(AgentToolContext context, CancellationToken cancellationToken = default)
@@ -27,3 +27,4 @@ public sealed class FindWorkspaceFilesTool(IWorkspaceService workspace) : IAgent
         }
     }
 }
+
