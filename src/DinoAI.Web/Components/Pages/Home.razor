@@ -12,126 +12,156 @@
 
 <PageTitle>DinoAI</PageTitle>
 
-<section class="dino-shell">
-    <header class="dino-header">
-        <div>
-            <p class="eyebrow">DinoAI Agent</p>
-            <h1>Local C# AI coding workspace</h1>
-            <p class="summary">Agent turns flow through DinoAI.Core: sessions, local planning, permissions, workspace tools, and shell checks.</p>
-        </div>
-        <button class="primary" @onclick="CreateSessionAsync">New session</button>
-    </header>
-
-    <section class="workspace-panel">
-        <div>
-            <p class="eyebrow">Workspace</p>
-            <h2>@WorkspaceRoot</h2>
-            <p class="summary">Found @ProjectFiles.Count project file(s) outside ignored folders.</p>
-        </div>
-        <div class="project-list">
-            @foreach (var file in ProjectFiles)
-            {
-                <span>@file.RelativePath</span>
-            }
-        </div>
-    </section>
-
-    <section class="tools-panel">
-        <div class="panel-heading">
+<section class="dino-app">
+    <aside class="session-sidebar">
+        <div class="sidebar-heading">
             <div>
-                <p class="eyebrow">Tools</p>
-                <h2>Manual Tool Execution</h2>
+                <p class="eyebrow">Sessions</p>
+                <h2>DinoAI</h2>
             </div>
-            <span>@ToolDefinitions.Count tool(s)</span>
+            <button class="icon-button" title="New session" @onclick="CreateSessionAsync">+</button>
         </div>
 
-        <div class="tool-list">
-            @foreach (var tool in ToolDefinitions)
+        <div class="session-list">
+            @if (SessionList.Count == 0)
             {
-                <span title="@tool.Description">@tool.Name</span>
+                <p class="empty small">No sessions yet.</p>
             }
-        </div>
-
-        <div class="tool-runner">
-            <label>
-                Tool
-                <select value="@SelectedToolName" @onchange="OnSelectedToolChanged">
-                    @foreach (var tool in ToolDefinitions)
-                    {
-                        <option value="@tool.Name">@tool.Name</option>
-                    }
-                </select>
-            </label>
-
-            <label>
-                Workspace root
-                <input @bind="WorkspaceRoot" @bind:event="oninput" />
-            </label>
-
-            <label class="approval-toggle">
-                <input type="checkbox" @bind="ToolApproved" />
-                Explicitly approve this tool call
-            </label>
-
-            @if (SelectedTool is not null)
+            else
             {
-                <div class="tool-description">
-                    <strong>@SelectedTool.Name</strong>
-                    <span>@SelectedTool.Description</span>
-                </div>
-
-                <div class="parameter-list">
-                    @foreach (var parameter in SelectedTool.Parameters)
-                    {
-                        <span>@parameter.Name @(parameter.IsRequired ? "required" : $"default {parameter.DefaultValue}")</span>
-                    }
-                </div>
-            }
-
-            <label>
-                Arguments
-                <textarea @bind="ToolArgumentsText" @bind:event="oninput" rows="5" placeholder="key=value&#10;command=git status --short&#10;timeoutSeconds=30"></textarea>
-            </label>
-
-            <button class="primary" @onclick="ExecuteSelectedToolAsync" disabled="@(IsToolBusy || string.IsNullOrWhiteSpace(SelectedToolName))">
-                @(IsToolBusy ? "Running tool..." : "Run tool")
-            </button>
-
-            @if (!string.IsNullOrWhiteSpace(ToolResultJson))
-            {
-                <pre class="tool-result @(LastToolSucceeded ? "success" : "failure")">@ToolResultJson</pre>
-            }
-        </div>
-    </section>
-
-    <div class="composer">
-        <input @bind="DraftMessage" @bind:event="oninput" placeholder="Try: /workspace, /files *.csproj, /read README.md, /status, /build" />
-        <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || IsBusy || string.IsNullOrWhiteSpace(DraftMessage))">
-            @(IsBusy ? "Running..." : "Send")
-        </button>
-    </div>
-
-    @if (ActiveSession is null)
-    {
-        <p class="empty">Create a session to start the workspace loop.</p>
-    }
-    else
-    {
-        <article class="session">
-            <h2>@ActiveSession.Title</h2>
-            <p class="session-id">@ActiveSession.Id</p>
-
-            <div class="messages">
-                @foreach (var message in ActiveSession.Messages)
+                @foreach (var session in SessionList)
                 {
-                    <div class="message @message.Role.ToString().ToLowerInvariant()">
-                        <strong>@message.Role</strong>
-                        <span>@message.Content</span>
-                    </div>
+                    <button class="session-tab @(ActiveSession?.Id == session.Id ? "active" : null)" @onclick="() => SelectSessionAsync(session.Id)">
+                        <strong>@session.Title</strong>
+                        <span>@session.Messages.Count message(s)</span>
+                        <time>@session.UpdatedAt.LocalDateTime.ToString("g")</time>
+                    </button>
+                }
+            }
+        </div>
+    </aside>
+
+    <main class="dino-shell">
+        <header class="dino-header">
+            <div>
+                <p class="eyebrow">DinoAI Agent</p>
+                <h1>Local C# AI coding workspace</h1>
+                <p class="summary">Agent turns flow through DinoAI.Core: sessions, local planning, permissions, workspace tools, and shell checks.</p>
+            </div>
+            <button class="primary" @onclick="CreateSessionAsync">New session</button>
+        </header>
+
+        <section class="workspace-panel">
+            <div>
+                <p class="eyebrow">Workspace</p>
+                <h2>@WorkspaceRoot</h2>
+                <p class="summary">Found @ProjectFiles.Count project file(s) outside ignored folders.</p>
+            </div>
+            <div class="project-list">
+                @foreach (var file in ProjectFiles)
+                {
+                    <span>@file.RelativePath</span>
                 }
             </div>
-        </article>
-    }
+        </section>
+
+        <section class="tools-panel">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">Tools</p>
+                    <h2>Manual Tool Execution</h2>
+                </div>
+                <span>@ToolDefinitions.Count tool(s)</span>
+            </div>
+
+            <div class="tool-list">
+                @foreach (var tool in ToolDefinitions)
+                {
+                    <span title="@tool.Description">@tool.Name</span>
+                }
+            </div>
+
+            <div class="tool-runner">
+                <label>
+                    Tool
+                    <select value="@SelectedToolName" @onchange="OnSelectedToolChanged">
+                        @foreach (var tool in ToolDefinitions)
+                        {
+                            <option value="@tool.Name">@tool.Name</option>
+                        }
+                    </select>
+                </label>
+
+                <label>
+                    Workspace root
+                    <input @bind="WorkspaceRoot" @bind:event="oninput" />
+                </label>
+
+                <label class="approval-toggle">
+                    <input type="checkbox" @bind="ToolApproved" />
+                    Explicitly approve this tool call
+                </label>
+
+                @if (SelectedTool is not null)
+                {
+                    <div class="tool-description">
+                        <strong>@SelectedTool.Name</strong>
+                        <span>@SelectedTool.Description</span>
+                    </div>
+
+                    <div class="parameter-list">
+                        @foreach (var parameter in SelectedTool.Parameters)
+                        {
+                            <span>@parameter.Name @(parameter.IsRequired ? "required" : $"default {parameter.DefaultValue}")</span>
+                        }
+                    </div>
+                }
+
+                <label>
+                    Arguments
+                    <textarea @bind="ToolArgumentsText" @bind:event="oninput" rows="5" placeholder="key=value&#10;command=git status --short&#10;timeoutSeconds=30"></textarea>
+                </label>
+
+                <button class="primary" @onclick="ExecuteSelectedToolAsync" disabled="@(IsToolBusy || string.IsNullOrWhiteSpace(SelectedToolName))">
+                    @(IsToolBusy ? "Running tool..." : "Run tool")
+                </button>
+
+                @if (!string.IsNullOrWhiteSpace(ToolResultJson))
+                {
+                    <pre class="tool-result @(LastToolSucceeded ? "success" : "failure")">@ToolResultJson</pre>
+                }
+            </div>
+        </section>
+
+        <div class="composer">
+            <input @bind="DraftMessage" @bind:event="oninput" placeholder="Try: /workspace, /files *.csproj, /read README.md, /status, /build" />
+            <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || IsBusy || string.IsNullOrWhiteSpace(DraftMessage))">
+                @(IsBusy ? "Running..." : "Send")
+            </button>
+        </div>
+
+        @if (ActiveSession is null)
+        {
+            <p class="empty">Create a session to start the workspace loop.</p>
+        }
+        else
+        {
+            <article class="session">
+                <h2>@ActiveSession.Title</h2>
+                <p class="session-id">@ActiveSession.Id</p>
+
+                <div class="messages">
+                    @foreach (var message in ActiveSession.Messages)
+                    {
+                        <div class="message @message.Role.ToString().ToLowerInvariant()">
+                            <strong>@message.Role</strong>
+                            <span>@message.Content</span>
+                        </div>
+                    }
+                </div>
+            </article>
+        }
+    </main>
 </section>
 
 @code {
@@ -160,6 +190,8 @@
 
     private string? ToolResultJson { get; set; }
 
+    private IReadOnlyList<AgentSession> SessionList { get; set; } = [];
+
     private IReadOnlyList<WorkspaceFile> ProjectFiles { get; set; } = [];
 
     private IReadOnlyList<AgentToolDefinition> ToolDefinitions { get; set; } = [];
@@ -168,16 +200,29 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var sessions = await Sessions.ListAsync();
-        ActiveSession = sessions.FirstOrDefault() ?? await Sessions.CreateAsync("Blazor workspace session");
+        await RefreshSessionsAsync();
+        ActiveSession = SessionList.FirstOrDefault() ?? await Sessions.CreateAsync("Blazor workspace session");
+        await RefreshSessionsAsync();
         ProjectFiles = await Workspace.FindFilesAsync(WorkspaceRoot, "*.csproj", 20);
         ToolDefinitions = Tools.List();
         SelectedToolName = ToolDefinitions.FirstOrDefault()?.Name ?? string.Empty;
     }
 
+    private async Task RefreshSessionsAsync()
+    {
+        SessionList = await Sessions.ListAsync();
+    }
+
     private async Task CreateSessionAsync()
     {
         ActiveSession = await Sessions.CreateAsync("Blazor workspace session");
+        DraftMessage = string.Empty;
+        await RefreshSessionsAsync();
+    }
+
+    private async Task SelectSessionAsync(Guid sessionId)
+    {
+        ActiveSession = await Sessions.GetAsync(sessionId);
         DraftMessage = string.Empty;
     }
 
@@ -196,6 +241,7 @@
         {
             var result = await Agent.RunAsync(ActiveSession.Id, WorkspaceRoot, message);
             ActiveSession = result.Session;
+            await RefreshSessionsAsync();
         }
         finally
         {

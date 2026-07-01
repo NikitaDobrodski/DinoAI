@@ -324,3 +324,104 @@ h1:focus {
 .message span {
     white-space: pre-wrap;
 }
+
+.dino-app {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    min-height: 100vh;
+}
+
+.session-sidebar {
+    background: #f6f8fa;
+    border-right: 1px solid #d8dee4;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.sidebar-heading {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.sidebar-heading h2 {
+    font-size: 1.15rem;
+    margin: 0;
+}
+
+.icon-button {
+    align-items: center;
+    border: 1px solid #d8dee4;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #24292f;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 1.2rem;
+    font-weight: 700;
+    height: 2rem;
+    justify-content: center;
+    width: 2rem;
+}
+
+.icon-button:hover {
+    background: #eef2f7;
+}
+
+.session-list {
+    display: grid;
+    gap: .55rem;
+    overflow: auto;
+}
+
+.session-tab {
+    border: 1px solid #d8dee4;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #24292f;
+    cursor: pointer;
+    display: grid;
+    gap: .2rem;
+    padding: .75rem;
+    text-align: left;
+}
+
+.session-tab:hover {
+    border-color: #8c959f;
+}
+
+.session-tab.active {
+    border-color: #1f6feb;
+    box-shadow: inset 3px 0 0 #1f6feb;
+}
+
+.session-tab strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-tab span,
+.session-tab time,
+.empty.small {
+    color: #5c6975;
+    font-size: .82rem;
+}
+
+@media (max-width: 880px) {
+    .dino-app {
+        grid-template-columns: 1fr;
+    }
+
+    .session-sidebar {
+        border-right: 0;
+        border-bottom: 1px solid #d8dee4;
+    }
+
+    .session-list {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+}
