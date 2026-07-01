@@ -87,3 +87,7 @@ dotnet run --project src/DinoAI.Cli -- tool shell.run D:\DinoAI command="git sta
 dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /status
 dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /build
 ```
+
+## Persistent sessions
+
+Sessions are stored in `.dinoai/sessions.json` under the workspace root. The `.dinoai/` directory is local runtime state and is ignored by git.

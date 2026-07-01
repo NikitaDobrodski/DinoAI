@@ -487,3 +487,6 @@ $RECYCLE.BIN/
 .templateengine/
 .tmp/
 
+
+# DinoAI local state
+.dinoai/

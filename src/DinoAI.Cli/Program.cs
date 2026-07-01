@@ -8,7 +8,9 @@ using DinoAI.Core.Tools.Shell;
 using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
 
-var sessions = new InMemoryAgentSessionStore();
+var workspaceRoot = ResolveInitialWorkspaceRoot(args);
+var sessionStorePath = Path.Combine(workspaceRoot, ".dinoai", "sessions.json");
+var sessions = new FileAgentSessionStore(sessionStorePath);
 var workspace = new FileSystemWorkspaceService();
 var permissionService = new DefaultToolPermissionService();
 var shellRunner = new ProcessShellCommandRunner();
@@ -70,8 +72,8 @@ if (args is ["ask", var askRoot, .. var messageParts])
 
 if (args is ["workspace", .. var rootParts])
 {
-    var workspaceRoot = GetRoot(rootParts);
-    var info = await workspace.DescribeAsync(workspaceRoot);
+    var requestedWorkspaceRoot = GetRoot(rootParts);
+    var info = await workspace.DescribeAsync(requestedWorkspaceRoot);
     Console.WriteLine($"Workspace: {info.RootPath}");
     Console.WriteLine($"Exists: {info.Exists}");
     Console.WriteLine("Directories:");
@@ -175,3 +177,21 @@ static IReadOnlyDictionary<string, string?> ParseArguments(string[] args)
 
 
 
+
+
+
+
+static string ResolveInitialWorkspaceRoot(string[] args)
+{
+    var root = args switch
+    {
+        ["ask", var askRoot, ..] => askRoot,
+        ["tool", _, var toolRoot, ..] => toolRoot,
+        ["read", var readRoot, ..] => readRoot,
+        ["files", var filesRoot, ..] => filesRoot,
+        ["workspace", .. var rootParts] when rootParts.Length > 0 => string.Join(' ', rootParts),
+        _ => Directory.GetCurrentDirectory()
+    };
+
+    return WorkspaceRootResolver.Resolve(root);
+}

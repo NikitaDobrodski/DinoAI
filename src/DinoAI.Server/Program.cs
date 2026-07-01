@@ -8,8 +8,10 @@ using DinoAI.Core.Tools.Workspace;
 using DinoAI.Core.Workspace;
 
 var builder = WebApplication.CreateBuilder(args);
+var workspaceRoot = WorkspaceRootResolver.Resolve(Directory.GetCurrentDirectory());
+var sessionStorePath = Path.Combine(workspaceRoot, ".dinoai", "sessions.json");
 
-builder.Services.AddSingleton<IAgentSessionStore, InMemoryAgentSessionStore>();
+builder.Services.AddSingleton<IAgentSessionStore>(_ => new FileAgentSessionStore(sessionStorePath));
 builder.Services.AddSingleton<IWorkspaceService, FileSystemWorkspaceService>();
 builder.Services.AddSingleton<IToolPermissionService, DefaultToolPermissionService>();
 builder.Services.AddSingleton<IShellCommandRunner, ProcessShellCommandRunner>();
@@ -174,6 +176,7 @@ public sealed record AddMessageRequest(AgentMessageRole Role, string Content);
 public sealed record RunTurnRequest(string? WorkspaceRoot, string Content);
 
 public sealed record ExecuteToolRequest(string? WorkspaceRoot, Dictionary<string, string?>? Arguments, bool IsUserApproved = false);
+
 
 
 

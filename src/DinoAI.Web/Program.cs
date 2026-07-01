@@ -9,8 +9,10 @@ using DinoAI.Core.Workspace;
 using DinoAI.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
+var workspaceRoot = WorkspaceRootResolver.Resolve(Directory.GetCurrentDirectory());
+var sessionStorePath = Path.Combine(workspaceRoot, ".dinoai", "sessions.json");
 
-builder.Services.AddSingleton<IAgentSessionStore, InMemoryAgentSessionStore>();
+builder.Services.AddSingleton<IAgentSessionStore>(_ => new FileAgentSessionStore(sessionStorePath));
 builder.Services.AddSingleton<IWorkspaceService, FileSystemWorkspaceService>();
 builder.Services.AddSingleton<IToolPermissionService, DefaultToolPermissionService>();
 builder.Services.AddSingleton<IShellCommandRunner, ProcessShellCommandRunner>();
@@ -41,5 +43,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
 
 
