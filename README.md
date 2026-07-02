@@ -1,93 +1,203 @@
 ﻿# DinoAI
 
-DinoAI is a C#/.NET local AI coding agent inspired by OpenCode, with a Blazor-first interface and a .NET-native workspace runtime.
+DinoAI — локальный ИИ-агент для разработки на C#/.NET. Проект вдохновлён OpenCode, но строится как приложение, нативное для .NET, с Blazor-интерфейсом, локальными инструментами рабочей папки, сессиями, разрешениями и подключаемыми API, совместимыми с OpenAI.
 
-## Project layout
+## Что уже готово
 
-- `src/DinoAI.Core` - agent domain, sessions, tools, permissions, model abstractions.
-- `src/DinoAI.Server` - local ASP.NET Core API for agent clients.
-- `src/DinoAI.Web` - Blazor UI for chat, workspace context, diffs, and approvals.
-- `src/DinoAI.Cli` - command-line entry point for chat, run, and serve workflows.
+- Blazor-интерфейс на русском языке.
+- Список сессий и сохранение истории сообщений.
+- Панель рабочей папки `D:\DinoAI`.
+- Локальные команды агента: `/workspace`, `/files`, `/read`, `/status`, `/diff`, `/build`.
+- Ручной запуск инструментов из интерфейса.
+- Настройки ИИ-модели через интерфейс: базовый адрес, модель и ключ API.
+- Поддержка API, совместимых с OpenAI: Gemini, Groq, OpenRouter, DeepSeek и другие совместимые провайдеры.
+- Git-репозиторий: https://github.com/NikitaDobrodski/DinoAI
 
-## MVP goal
+## Структура проекта
 
-Build the first useful loop:
+- `src/DinoAI.Core` — доменная логика агента, сессии, инструменты, разрешения, настройки и провайдеры модели.
+- `src/DinoAI.Server` — локальный ASP.NET Core API для клиентов агента.
+- `src/DinoAI.Web` — Blazor-интерфейс для чата, сессий, настроек модели, рабочей папки и ручного запуска инструментов.
+- `src/DinoAI.Cli` — консольный вход для проверки команд, инструментов и сценариев агента.
 
-1. User sends a task.
-2. Agent reads and searches the workspace.
-3. Agent proposes or applies a patch.
-4. Agent runs checks.
-5. User reviews the result and diff.
+## Запуск
 
-## Workspace tools
+Из папки проекта:
 
-DinoAI.Core now includes a guarded filesystem workspace service. It can describe a root, find files by pattern, and read files by relative path while blocking paths that escape the workspace root.
+```powershell
+cd D:\DinoAI
+dotnet run --project src/DinoAI.Web --urls http://127.0.0.1:5088
+```
 
-CLI examples:
+После запуска интерфейс доступен по адресу:
+
+```text
+http://127.0.0.1:5088/
+```
+
+## Настройка модели
+
+В интерфейсе есть блок `Модель`.
+
+Для совместимого API нужно заполнить:
+
+- `Базовый адрес` — адрес API, совместимого с OpenAI.
+- `Модель` — имя модели у выбранного провайдера.
+- `Ключ API` — ключ доступа.
+
+После заполнения:
+
+1. Нажать `Сохранить настройки`.
+2. Нажать `Проверить подключение`.
+3. Если проверка успешна, обычные сообщения в чат будут отправляться в модель.
+
+Пример для Google Gemini:
+
+```text
+Базовый адрес: https://generativelanguage.googleapis.com/v1beta/openai/
+Модель: gemini-3.5-flash
+```
+
+Пример для Groq:
+
+```text
+Базовый адрес: https://api.groq.com/openai/v1
+Модель: llama-3.1-8b-instant
+```
+
+Пример для OpenRouter:
+
+```text
+Базовый адрес: https://openrouter.ai/api/v1
+Модель: выбрать совместимую модель на стороне OpenRouter
+```
+
+Пример для DeepSeek:
+
+```text
+Базовый адрес: https://api.deepseek.com/v1
+Модель: deepseek-chat
+```
+
+Важно: бесплатный чат на сайте провайдера не всегда означает бесплатный API. Если провайдер возвращает `402 Payment Required`, значит запрос дошёл до API, но на аккаунте нет доступного баланса или бесплатного лимита.
+
+## Команды в чате
+
+Команды ниже выполняются локально и не требуют ИИ-модели:
+
+```text
+/workspace
+/files *.csproj
+/files *.razor
+/files *.cs
+/read README.md
+/status
+/diff
+/build
+```
+
+Примеры:
+
+```text
+/files *.csproj
+/read src/DinoAI.Web/Components/Pages/Home.razor
+/build
+```
+
+Если сообщение не похоже на локальную команду, DinoAI отправляет его в настроенную модель.
+
+## Инструменты агента
+
+Сейчас доступны инструменты:
+
+- `workspace.describe` — показать структуру рабочей папки.
+- `workspace.find_files` — найти файлы по шаблону.
+- `workspace.read_file` — прочитать файл внутри рабочей папки.
+- `workspace.write_file` — записать файл внутри рабочей папки, только с явным разрешением.
+- `shell.run` — выполнить разрешённую команду оболочки.
+
+Для инструмента `shell.run` без подтверждения разрешены только безопасные команды:
+
+- `dotnet build`
+- `dotnet test`
+- `dotnet --info`
+- `git status`
+- `git diff`
+- `git log`
+
+Остальные команды требуют явного подтверждения.
+
+## CLI-примеры
+
+Показать рабочую папку:
 
 ```powershell
 dotnet run --project src/DinoAI.Cli -- workspace D:\DinoAI
+```
+
+Найти проекты:
+
+```powershell
 dotnet run --project src/DinoAI.Cli -- files D:\DinoAI *.csproj
+```
+
+Прочитать файл:
+
+```powershell
 dotnet run --project src/DinoAI.Cli -- read D:\DinoAI README.md
 ```
 
-## Tool registry
-
-Workspace operations are also exposed as agent tools:
-
-- `workspace.describe`
-- `workspace.find_files`
-- `workspace.read_file`
-
-CLI examples:
-
-```powershell
-dotnet run --project src/DinoAI.Cli -- tools
-dotnet run --project src/DinoAI.Cli -- tool workspace.find_files D:\DinoAI pattern=*.csproj maxResults=20
-dotnet run --project src/DinoAI.Cli -- tool workspace.read_file D:\DinoAI path=README.md
-```
-
-## Local agent runner
-
-DinoAI now has a deterministic local agent runner. It does not call an LLM yet; it plans simple workspace tool calls from commands or intent-like messages and writes user, tool, and assistant messages into the session.
-
-Try:
+Запустить команду агента:
 
 ```powershell
 dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /workspace
-dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /files *.csproj
-dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /read README.md
-dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI show project files
 ```
 
-## Permissions and writes
-
-DinoAI has a first permission layer. Read-only workspace tools are allowed by default. Workspace writes require explicit approval.
-
-Example blocked write:
+Показать список инструментов:
 
 ```powershell
-dotnet run --project src/DinoAI.Cli -- tool workspace.write_file D:\DinoAI path=.tmp/permission-test.txt content=hello
+dotnet run --project src/DinoAI.Cli -- tools
 ```
 
-Example approved write:
+Запустить инструмент вручную:
 
 ```powershell
-dotnet run --project src/DinoAI.Cli -- tool workspace.write_file D:\DinoAI path=.tmp/permission-test.txt content=hello confirm=true overwrite=true
+dotnet run --project src/DinoAI.Cli -- tool workspace.find_files D:\DinoAI pattern=*.csproj maxResults=20
 ```
 
-## Shell tool
+## Локальные данные
 
-DinoAI includes a permission-aware shell tool. A small allowlist can run without explicit approval: `dotnet build`, `dotnet test`, `dotnet --info`, `git status`, `git diff`, and `git log`. Other commands return `Permission Ask` unless called with `confirm=true`.
+DinoAI хранит локальные данные времени работы в папке:
 
-Examples:
-
-```powershell
-dotnet run --project src/DinoAI.Cli -- tool shell.run D:\DinoAI command="git status --short"
-dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /status
-dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /build
+```text
+D:\DinoAI\.dinoai
 ```
 
-## Persistent sessions
+Файлы:
 
-Sessions are stored in `.dinoai/sessions.json` under the workspace root. The `.dinoai/` directory is local runtime state and is ignored by git.
+- `sessions.json` — история сессий и сообщений.
+- `model-settings.json` — настройки провайдера модели.
+
+Папка `.dinoai/` является локальным состоянием и игнорируется git.
+
+## Текущая цель MVP
+
+Ближайшая цель — сделать полезный цикл локального агента разработки:
+
+1. Пользователь пишет задачу.
+2. Агент читает и ищет файлы проекта.
+3. Агент предлагает действия или изменения.
+4. Пользователь подтверждает опасные операции.
+5. Агент выполняет команды и проверки.
+6. Пользователь видит результат, различия и историю действий.
+
+## Следующие шаги
+
+- Улучшить статус модели: `ключ задан`, `подключение проверено`, `ошибка ключа`, `нет баланса`, `модель не найдена`.
+- Добавить более безопасное хранение ключа API.
+- Научить модель запрашивать инструменты через понятный план действий.
+- Сделать подтверждение вызовов инструментов прямо в чате.
+- Добавить просмотр различий и применение патчей из интерфейса.
+
+
+
