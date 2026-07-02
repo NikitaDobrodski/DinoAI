@@ -19,10 +19,15 @@
     <aside class="session-sidebar">
         <div class="sidebar-heading">
             <div>
-                <p class="eyebrow">Сессии</p>
+                <p class="eyebrow">Проект</p>
                 <h2>DinoAI</h2>
             </div>
             <button class="icon-button" title="Новая сессия" @onclick="CreateSessionAsync">+</button>
+        </div>
+
+        <div class="workspace-mini">
+            <span>Рабочая папка</span>
+            <strong>@WorkspaceRoot</strong>
         </div>
 
         <div class="session-list">
@@ -45,167 +50,189 @@
     </aside>
 
     <main class="dino-shell">
-        <header class="dino-header">
+        <header class="app-topbar">
             <div>
-                <p class="eyebrow">DinoAI Agent</p>
-                <h1>Локальная C#-среда для AI-разработки</h1>
-                <p class="summary">DinoAI управляет сессиями, локальными инструментами, разрешениями и проверками workspace.</p>
+                <p class="eyebrow">Локальный агент</p>
+                <h1>@(ActiveSession is null ? "Новая сессия" : GetSessionTitle(ActiveSession))</h1>
             </div>
-            <button class="primary" @onclick="CreateSessionAsync">Новая сессия</button>
+
+            <div class="topbar-actions">
+                <span class="model-pill @ModelStateClass">@ModelStateLabel</span>
+                <button class="secondary" @onclick="ToggleToolsPanel">Инструменты</button>
+                <button class="secondary" @onclick="ToggleSettingsPanel">Настройки</button>
+                <button class="primary" @onclick="CreateSessionAsync">Новая сессия</button>
+            </div>
         </header>
 
-        <section class="workspace-panel">
+        <section class="context-strip">
             <div>
-                <p class="eyebrow">Рабочая папка</p>
-                <h2>@WorkspaceRoot</h2>
-                <p class="summary">Найдено файлов проектов: @ProjectFiles.Count.</p>
+                <span>Модель</span>
+                <strong>@(ModelStatus.Model ?? "не выбрана")</strong>
             </div>
-            <div class="project-list">
-                @foreach (var file in ProjectFiles)
-                {
-                    <span>@file.RelativePath</span>
-                }
+            <div>
+                <span>Проекты</span>
+                <strong>@ProjectFiles.Count файлов</strong>
             </div>
-        </section>
-
-        <section class="model-panel">
-            <div class="model-summary">
-                <div>
-                    <p class="eyebrow">Модель</p>
-                    <h2>@ModelStatus.ProviderName</h2>
-                    <p class="summary">@ModelStatusSummary</p>
-                </div>
-                <span class="model-state @ModelStateClass">@ModelStateLabel</span>
-            </div>
-
-            <div class="model-settings-form">
-                <label>
-                    Base URL
-                    <input @bind="ModelBaseUrl" @bind:event="oninput" placeholder="https://api.deepseek.com/v1" />
-                </label>
-
-                <label>
-                    Модель
-                    <input @bind="ModelName" @bind:event="oninput" placeholder="deepseek-chat" />
-                </label>
-
-                <label>
-                    API key
-                    <input type="password" @bind="ModelApiKey" @bind:event="oninput" placeholder="sk-..." autocomplete="off" />
-                </label>
-
-                <div class="model-actions">
-                    <button class="primary" @onclick="SaveModelSettingsAsync" disabled="@IsModelSettingsBusy">
-                        @(IsModelSettingsBusy ? "Сохраняю..." : "Сохранить настройки")
-                    </button>
-                    <button class="secondary" @onclick="TestModelSettingsAsync" disabled="@(IsModelSettingsBusy || !ModelStatus.IsConfigured)">
-                        Проверить подключение
-                    </button>
-                </div>
-
-                @if (!string.IsNullOrWhiteSpace(ModelSettingsMessage))
-                {
-                    <p class="settings-message @(LastModelSettingsSucceeded ? "success" : "failure")">@ModelSettingsMessage</p>
-                }
+            <div>
+                <span>Команды</span>
+                <strong>/workspace /files /read /build</strong>
             </div>
         </section>
 
-        <section class="tools-panel">
-            <div class="panel-heading">
-                <div>
-                    <p class="eyebrow">Инструменты</p>
-                    <h2>Ручной запуск инструмента</h2>
+        @if (ShowSettings)
+        {
+            <section class="settings-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Настройки</p>
+                        <h2>Провайдер модели</h2>
+                        <p class="summary">@ModelStatusSummary</p>
+                    </div>
+                    <button class="icon-button" title="Закрыть настройки" @onclick="ToggleSettingsPanel">x</button>
                 </div>
-                <span>@ToolDefinitions.Count инстр.</span>
-            </div>
 
-            <div class="tool-list">
-                @foreach (var tool in ToolDefinitions)
-                {
-                    <span title="@tool.Description">@tool.Name</span>
-                }
-            </div>
+                <div class="model-settings-form">
+                    <label>
+                        Базовый адрес
+                        <input @bind="ModelBaseUrl" @bind:event="oninput" placeholder="https://openrouter.ai/api/v1" />
+                    </label>
 
-            <div class="tool-runner">
-                <label>
-                    Инструмент
-                    <select value="@SelectedToolName" @onchange="OnSelectedToolChanged">
-                        @foreach (var tool in ToolDefinitions)
-                        {
-                            <option value="@tool.Name">@tool.Name</option>
-                        }
-                    </select>
-                </label>
+                    <label>
+                        Модель
+                        <input @bind="ModelName" @bind:event="oninput" placeholder="deepseek/deepseek-v4-flash" />
+                    </label>
 
-                <label>
-                    Корень workspace
-                    <input @bind="WorkspaceRoot" @bind:event="oninput" />
-                </label>
+                    <label>
+                        Ключ API
+                        <input type="password" @bind="ModelApiKey" @bind:event="oninput" placeholder="sk-..." autocomplete="off" />
+                    </label>
 
-                <label class="approval-toggle">
-                    <input type="checkbox" @bind="ToolApproved" />
-                    Явно разрешить этот вызов инструмента
-                </label>
-
-                @if (SelectedTool is not null)
-                {
-                    <div class="tool-description">
-                        <strong>@SelectedTool.Name</strong>
-                        <span>@SelectedTool.Description</span>
+                    <div class="model-actions">
+                        <button class="primary" @onclick="SaveModelSettingsAsync" disabled="@IsModelSettingsBusy">
+                            @(IsModelSettingsBusy ? "Сохраняю..." : "Сохранить")
+                        </button>
+                        <button class="secondary" @onclick="TestModelSettingsAsync" disabled="@(IsModelSettingsBusy || !ModelStatus.IsConfigured)">
+                            Проверить подключение
+                        </button>
                     </div>
 
-                    <div class="parameter-list">
-                        @foreach (var parameter in SelectedTool.Parameters)
-                        {
-                            <span>@parameter.Name @(parameter.IsRequired ? "обяз." : $"по умолч. {parameter.DefaultValue}")</span>
-                        }
+                    @if (!string.IsNullOrWhiteSpace(ModelSettingsMessage))
+                    {
+                        <p class="settings-message @(LastModelSettingsSucceeded ? "success" : "failure")">@ModelSettingsMessage</p>
+                    }
+                </div>
+            </section>
+        }
+
+        @if (ShowTools)
+        {
+            <section class="tools-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Инструменты</p>
+                        <h2>Ручной запуск</h2>
                     </div>
-                }
+                    <span>@ToolDefinitions.Count инстр.</span>
+                </div>
 
-                <label>
-                    Аргументы
-                    <textarea @bind="ToolArgumentsText" @bind:event="oninput" rows="5" placeholder="key=value&#10;command=git status --short&#10;timeoutSeconds=30"></textarea>
-                </label>
+                <div class="tool-list">
+                    @foreach (var tool in ToolDefinitions)
+                    {
+                        <span title="@tool.Description">@tool.Name</span>
+                    }
+                </div>
 
-                <button class="primary" @onclick="ExecuteSelectedToolAsync" disabled="@(IsToolBusy || string.IsNullOrWhiteSpace(SelectedToolName))">
-                    @(IsToolBusy ? "Инструмент выполняется..." : "Запустить инструмент")
-                </button>
+                <div class="tool-runner">
+                    <label>
+                        Инструмент
+                        <select value="@SelectedToolName" @onchange="OnSelectedToolChanged">
+                            @foreach (var tool in ToolDefinitions)
+                            {
+                                <option value="@tool.Name">@tool.Name</option>
+                            }
+                        </select>
+                    </label>
 
-                @if (!string.IsNullOrWhiteSpace(ToolResultJson))
-                {
-                    <pre class="tool-result @(LastToolSucceeded ? "success" : "failure")">@ToolResultJson</pre>
-                }
-            </div>
+                    <label>
+                        Корень workspace
+                        <input @bind="WorkspaceRoot" @bind:event="oninput" />
+                    </label>
+
+                    <label class="approval-toggle">
+                        <input type="checkbox" @bind="ToolApproved" />
+                        Явно разрешить этот вызов инструмента
+                    </label>
+
+                    @if (SelectedTool is not null)
+                    {
+                        <div class="tool-description">
+                            <strong>@SelectedTool.Name</strong>
+                            <span>@SelectedTool.Description</span>
+                        </div>
+
+                        <div class="parameter-list">
+                            @foreach (var parameter in SelectedTool.Parameters)
+                            {
+                                <span>@parameter.Name @(parameter.IsRequired ? "обяз." : $"по умолч. {parameter.DefaultValue}")</span>
+                            }
+                        </div>
+                    }
+
+                    <label>
+                        Аргументы
+                        <textarea @bind="ToolArgumentsText" @bind:event="oninput" rows="5" placeholder="key=value&#10;command=git status --short&#10;timeoutSeconds=30"></textarea>
+                    </label>
+
+                    <button class="primary" @onclick="ExecuteSelectedToolAsync" disabled="@(IsToolBusy || string.IsNullOrWhiteSpace(SelectedToolName))">
+                        @(IsToolBusy ? "Инструмент выполняется..." : "Запустить инструмент")
+                    </button>
+
+                    @if (!string.IsNullOrWhiteSpace(ToolResultJson))
+                    {
+                        <pre class="tool-result @(LastToolSucceeded ? "success" : "failure")">@ToolResultJson</pre>
+                    }
+                </div>
+            </section>
+        }
+
+        <section class="chat-panel">
+            @if (ActiveSession is null)
+            {
+                <div class="empty-chat">
+                    <h2>Создай сессию</h2>
+                    <p>После этого можно писать обычные вопросы или локальные команды.</p>
+                </div>
+            }
+            else
+            {
+                <div class="messages">
+                    @if (ActiveSession.Messages.Count == 0)
+                    {
+                        <div class="empty-chat compact">
+                            <h2>Чем займёмся?</h2>
+                            <p>Напиши задачу, вопрос по проекту или команду вроде <code>/workspace</code>.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var message in ActiveSession.Messages)
+                        {
+                            <div class="message @message.Role.ToString().ToLowerInvariant()">
+                                <strong>@GetRoleLabel(message.Role)</strong>
+                                <span>@message.Content</span>
+                            </div>
+                        }
+                    }
+                </div>
+            }
         </section>
 
         <div class="composer">
-            <input @bind="DraftMessage" @bind:event="oninput" placeholder="Попробуй: /workspace, /files *.csproj, /read README.md, /status, /build" />
+            <input @bind="DraftMessage" @bind:event="oninput" placeholder="Напиши задачу или команду: /workspace, /files *.csproj, /read README.md, /build" />
             <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || IsBusy || string.IsNullOrWhiteSpace(DraftMessage))">
-                @(IsBusy ? "Выполняется..." : "Отправить")
+                @(IsBusy ? "Думаю..." : "Отправить")
             </button>
         </div>
-
-        @if (ActiveSession is null)
-        {
-            <p class="empty">Создай сессию, чтобы начать работу с workspace.</p>
-        }
-        else
-        {
-            <article class="session">
-                <h2>@GetSessionTitle(ActiveSession)</h2>
-                <p class="session-id">@ActiveSession.Id</p>
-
-                <div class="messages">
-                    @foreach (var message in ActiveSession.Messages)
-                    {
-                        <div class="message @message.Role.ToString().ToLowerInvariant()">
-                            <strong>@GetRoleLabel(message.Role)</strong>
-                            <span>@message.Content</span>
-                        </div>
-                    }
-                </div>
-            </article>
-        }
     </main>
 </section>
 
@@ -228,6 +255,10 @@
     private bool ToolApproved { get; set; }
 
     private bool LastToolSucceeded { get; set; }
+
+    private bool ShowSettings { get; set; }
+
+    private bool ShowTools { get; set; }
 
     private string SelectedToolName { get; set; } = string.Empty;
 
@@ -288,6 +319,24 @@
         SelectedToolName = ToolDefinitions.FirstOrDefault()?.Name ?? string.Empty;
     }
 
+    private void ToggleSettingsPanel()
+    {
+        ShowSettings = !ShowSettings;
+        if (ShowSettings)
+        {
+            ShowTools = false;
+        }
+    }
+
+    private void ToggleToolsPanel()
+    {
+        ShowTools = !ShowTools;
+        if (ShowTools)
+        {
+            ShowSettings = false;
+        }
+    }
+
     private async Task LoadModelSettingsAsync()
     {
         var options = await ModelSettings.GetAsync();
@@ -306,8 +355,11 @@
         {
             await ModelSettings.SaveAsync(new OpenAICompatibleChatModelOptions(ModelBaseUrl, ModelApiKey, ModelName));
             ModelStatus = ModelProvider.GetStatus();
+            IsModelConnectionVerified = false;
             LastModelSettingsSucceeded = true;
-            ModelSettingsMessage = "Настройки модели сохранены.";
+            ModelSettingsMessage = ModelStatus.IsConfigured
+                ? "Настройки модели сохранены. Теперь проверь подключение."
+                : "Настройки модели сохранены, но ключ API не задан.";
         }
         catch (Exception ex) when (ex is ArgumentException or IOException)
         {
@@ -333,20 +385,25 @@
             ], Temperature: 0));
 
             ModelStatus = ModelProvider.GetStatus();
+            IsModelConnectionVerified = true;
             LastModelSettingsSucceeded = true;
             ModelSettingsMessage = $"Подключение работает: {response.Content}";
         }
         catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TaskCanceledException)
         {
             ModelStatus = ModelProvider.GetStatus();
+            IsModelConnectionVerified = false;
             LastModelSettingsSucceeded = false;
-            ModelSettingsMessage = $"Проверка не прошла: {ex.Message}";
+            ModelSettingsMessage = ex.Message.StartsWith("Проверка не прошла", StringComparison.Ordinal)
+                ? ex.Message
+                : $"Проверка не прошла: {ex.Message}";
         }
         finally
         {
             IsModelSettingsBusy = false;
         }
     }
+
     private async Task RefreshSessionsAsync()
     {
         SessionList = await Sessions.ListAsync();
@@ -455,6 +512,7 @@
             _ => session.Title
         };
     }
+
     private static string GetRoleLabel(AgentMessageRole role)
     {
         return role switch
@@ -467,7 +525,4 @@
         };
     }
 }
-
-
-
 
