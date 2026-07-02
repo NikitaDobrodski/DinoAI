@@ -73,9 +73,9 @@
                 <div>
                     <p class="eyebrow">Модель</p>
                     <h2>@ModelStatus.ProviderName</h2>
-                    <p class="summary">@(ModelStatus.IsConfigured ? $"Подключена модель {ModelStatus.Model}" : ModelStatus.Reason)</p>
+                    <p class="summary">@ModelStatusSummary</p>
                 </div>
-                <span class="model-state @(ModelStatus.IsConfigured ? "ready" : "missing")">@(ModelStatus.IsConfigured ? "готово" : "не настроено")</span>
+                <span class="model-state @ModelStateClass">@ModelStateLabel</span>
             </div>
 
             <div class="model-settings-form">
@@ -247,7 +247,27 @@
 
     private bool LastModelSettingsSucceeded { get; set; }
 
+    private bool IsModelConnectionVerified { get; set; }
+
     private ChatModelProviderStatus ModelStatus { get; set; } = ChatModelProviderStatus.NotConfigured("OpenAI-compatible", "Модель еще не проверена.");
+
+    private string ModelStateClass => !ModelStatus.IsConfigured
+        ? "missing"
+        : IsModelConnectionVerified
+            ? "ready"
+            : "pending";
+
+    private string ModelStateLabel => !ModelStatus.IsConfigured
+        ? "не настроено"
+        : IsModelConnectionVerified
+            ? "проверено"
+            : "ключ задан";
+
+    private string ModelStatusSummary => !ModelStatus.IsConfigured
+        ? ModelStatus.Reason ?? "Модель не настроена."
+        : IsModelConnectionVerified
+            ? $"Подключение проверено, активная модель: {ModelStatus.Model}."
+            : $"Ключ задан, активная модель: {ModelStatus.Model}. Нажми «Проверить подключение», чтобы убедиться, что API отвечает.";
 
     private IReadOnlyList<AgentSession> SessionList { get; set; } = [];
 
@@ -447,6 +467,7 @@
         };
     }
 }
+
 
 
 

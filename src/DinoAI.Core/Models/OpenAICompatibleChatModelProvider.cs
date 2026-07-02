@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
@@ -43,7 +44,10 @@ public sealed class OpenAICompatibleChatModelProvider(
             request.Temperature));
 
         using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(await FormatProviderErrorAsync(response, cancellationToken));
+        }
 
         var payload = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(cancellationToken: cancellationToken);
         var content = payload?.Choices?.FirstOrDefault()?.Message?.Content;
@@ -53,6 +57,42 @@ public sealed class OpenAICompatibleChatModelProvider(
         }
 
         return new ChatModelResponse(content, payload?.Model ?? request.Model ?? options.Model);
+    }
+
+    private static async Task<string> FormatProviderErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var details = await ReadErrorDetailsAsync(response, cancellationToken);
+        var reason = response.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized => "ключ API не принят провайдером",
+            HttpStatusCode.Forbidden => "у ключа API нет доступа к этой модели или endpoint",
+            HttpStatusCode.PaymentRequired => "у API-аккаунта нет доступного баланса или бесплатного лимита",
+            HttpStatusCode.NotFound => "модель или endpoint не найдены",
+            (HttpStatusCode)429 => "превышен лимит запросов",
+            _ => $"провайдер вернул HTTP {(int)response.StatusCode} {response.ReasonPhrase}"
+        };
+
+        return string.IsNullOrWhiteSpace(details)
+            ? $"Проверка не прошла: {reason}."
+            : $"Проверка не прошла: {reason}. Детали: {details}";
+    }
+
+    private static async Task<string?> ReadErrorDetailsAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return null;
+            }
+
+            return content.Length <= 500 ? content : content[..500] + "...";
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     private sealed record ChatCompletionRequest(

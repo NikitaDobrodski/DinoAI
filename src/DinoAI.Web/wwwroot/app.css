@@ -427,9 +427,7 @@ h1:focus {
 }
 
 .model-panel {
-    align-items: flex-start;
-    display: flex;
-    justify-content: space-between;
+    display: grid;
     gap: 1rem;
     border: 1px solid #d8dee4;
     border-radius: 8px;
@@ -454,6 +452,11 @@ h1:focus {
 .model-state.ready {
     background: #ecfdf3;
     color: #05603a;
+}
+
+.model-state.pending {
+    background: #eff6ff;
+    color: #1d4ed8;
 }
 
 .model-state.missing {
@@ -550,4 +553,5 @@ h1:focus {
     border: 1px solid #fecdd6;
     color: #9f1239;
 }
+
 
