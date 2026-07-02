@@ -78,7 +78,7 @@ public sealed class LocalAgentRunner(
                 .Where(message => message.Role is AgentMessageRole.User or AgentMessageRole.Assistant or AgentMessageRole.System)
                 .TakeLast(20)
                 .Select(message => new ChatModelMessage(ToModelRole(message.Role), message.Content))
-                .Prepend(new ChatModelMessage("system", "Ты DinoAI, локальный C# coding agent. Отвечай кратко и практично. Если нужен доступ к файлам или shell, предлагай безопасные команды workspace-инструментов."))
+                .Prepend(new ChatModelMessage("system", BuildSystemPrompt(status)))
                 .ToArray();
 
             var response = await modelProvider.CompleteAsync(new ChatModelRequest(messages), cancellationToken);
@@ -94,6 +94,11 @@ public sealed class LocalAgentRunner(
         }
     }
 
+    private static string BuildSystemPrompt(ChatModelProviderStatus status)
+    {
+        var modelName = string.IsNullOrWhiteSpace(status.Model) ? "неизвестная модель" : status.Model;
+        return $"Ты DinoAI, локальный C# agent-интерфейс для разработки. Твои ответы генерирует внешняя OpenAI-compatible модель с текущим Model ID: {modelName}. Если пользователь спрашивает, какая модель используется, называй именно этот Model ID и не утверждай, что работаешь на локально развернутой LLM, если это не указано в Model ID. Отвечай кратко и практично. Если нужен доступ к файлам или shell, предлагай безопасные команды workspace-инструментов.";
+    }
     private static string ToModelRole(AgentMessageRole role)
     {
         return role switch
@@ -288,6 +293,7 @@ public sealed class LocalAgentRunner(
 
     private sealed record ToolPlan(string ToolName, IReadOnlyDictionary<string, string?> Arguments);
 }
+
 
 
 
