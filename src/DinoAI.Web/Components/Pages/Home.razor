@@ -69,6 +69,8 @@
             </div>
         </header>
 
+        <section class="agent-workbench">
+            <div class="agent-main">
         <section class="context-strip">
             <div>
                 <span>Модель</span>
@@ -245,6 +247,56 @@
                 @(IsBusy ? "Думаю..." : "Отправить")
             </button>
         </div>
+            </div>
+
+            <aside class="inspector-panel">
+                <section class="inspector-card session-card">
+                    <p class="eyebrow">Сессия</p>
+                    <h2>@(ActiveSession is null ? "Новая сессия" : GetSessionTitle(ActiveSession))</h2>
+                    <span>@(ActiveSession?.Id.ToString("N")[..8] ?? "draft")</span>
+                </section>
+
+                <section class="inspector-card">
+                    <div class="inspector-heading">
+                        <h3>Context</h3>
+                        <span>@ContextUsedPercent%</span>
+                    </div>
+                    <div class="meter"><span style="width: @ContextUsedPercent%"></span></div>
+                    <dl>
+                        <div><dt>Сообщения</dt><dd>@(ActiveSession?.Messages.Count ?? 0)</dd></div>
+                        <div><dt>Оценка токенов</dt><dd>@ContextTokenEstimate</dd></div>
+                        <div><dt>Workspace</dt><dd>@ProjectFiles.Count csproj</dd></div>
+                    </dl>
+                </section>
+
+                <section class="inspector-card">
+                    <div class="inspector-heading">
+                        <h3>Model</h3>
+                        <span class="dot @ModelStateClass"></span>
+                    </div>
+                    <strong>@(ModelStatus.Model ?? "не выбрана")</strong>
+                    <p>@ModelStateLabel</p>
+                </section>
+
+                <section class="inspector-card">
+                    <div class="inspector-heading">
+                        <h3>Tools</h3>
+                        <span>@ToolDefinitions.Count</span>
+                    </div>
+                    <div class="mini-tool-list">
+                        @foreach (var tool in ToolDefinitions.Take(6))
+                        {
+                            <span>@tool.Name</span>
+                        }
+                    </div>
+                </section>
+
+                <section class="inspector-card muted-card">
+                    <h3>LSP</h3>
+                    <p>Активируется, когда DinoAI начнет читать и индексировать файлы проекта.</p>
+                </section>
+            </aside>
+        </section>
     </main>
 </section>
 
@@ -323,6 +375,10 @@
     private IReadOnlyList<AgentToolDefinition> ToolDefinitions { get; set; } = [];
 
     private AgentToolDefinition? SelectedTool => ToolDefinitions.FirstOrDefault(tool => tool.Name == SelectedToolName);
+
+    private int ContextTokenEstimate => ActiveSession?.Messages.Sum(message => Math.Max(1, message.Content.Length / 4)) ?? 0;
+
+    private int ContextUsedPercent => Math.Clamp(ContextTokenEstimate / 80, 0, 100);
 
     protected override async Task OnInitializedAsync()
     {
