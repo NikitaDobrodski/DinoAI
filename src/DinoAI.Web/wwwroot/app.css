@@ -293,7 +293,7 @@ textarea {
 .tool-runner input,
 .tool-runner select,
 .tool-runner textarea,
-.composer input {
+.composer textarea {
     background: #fff;
     border: 1px solid #c8d0dc;
     border-radius: 8px;
@@ -414,9 +414,35 @@ textarea {
     font-size: .9rem;
 }
 
-.message span {
+.message-content {
     line-height: 1.45;
-    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.message-content p {
+    margin: 0 0 .55rem;
+}
+
+.message-content p:last-child {
+    margin-bottom: 0;
+}
+
+.message-content pre {
+    background: #0f172a;
+    border-radius: 8px;
+    color: #e2e8f0;
+    margin: .45rem 0;
+    overflow: auto;
+    padding: .8rem;
+}
+
+.message-content code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.message-content pre code {
+    background: transparent;
+    padding: 0;
 }
 
 .empty-chat {
@@ -449,8 +475,34 @@ textarea {
     padding-top: .15rem;
 }
 
-.composer input {
+.composer textarea {
+    min-height: 3.25rem;
     min-width: 0;
+    resize: vertical;
+}
+
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.quick-action {
+    background: #eef2f7;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: #334155;
+    cursor: pointer;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: .82rem;
+    font-weight: 800;
+    padding: .45rem .7rem;
+}
+
+.quick-action:hover {
+    background: #dbeafe;
+    border-color: #bfdbfe;
+    color: var(--blue-dark);
 }
 
 code {
@@ -521,3 +573,4 @@ code {
         justify-content: stretch;
     }
 }
+

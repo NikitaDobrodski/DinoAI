@@ -1,6 +1,10 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@using System.Net
+@using System.Text
 @using System.Text.Json
+@using System.Text.RegularExpressions
+@using Microsoft.JSInterop
 @using DinoAI.Core.Agents
 @using DinoAI.Core.Models
 @using DinoAI.Core.Sessions
@@ -11,6 +15,7 @@
 @inject IChatModelProvider ModelProvider
 @inject IChatModelSettingsStore ModelSettings
 @inject IWorkspaceService Workspace
+@inject IJSRuntime JS
 @inject IAgentToolRegistry Tools
 
 <PageTitle>DinoAI</PageTitle>
@@ -195,7 +200,7 @@
             </section>
         }
 
-        <section class="chat-panel">
+        <section class="chat-panel" @ref="ChatPanel">
             @if (ActiveSession is null)
             {
                 <div class="empty-chat">
@@ -219,7 +224,7 @@
                         {
                             <div class="message @message.Role.ToString().ToLowerInvariant()">
                                 <strong>@GetRoleLabel(message.Role)</strong>
-                                <span>@message.Content</span>
+                                <div class="message-content">@RenderMessageContent(message.Content)</div>
                             </div>
                         }
                     }
@@ -227,8 +232,15 @@
             }
         </section>
 
+        <div class="quick-actions">
+            <button class="quick-action" @onclick="UseWorkspaceCommand">/workspace</button>
+            <button class="quick-action" @onclick="UseFilesCommand">/files *.csproj</button>
+            <button class="quick-action" @onclick="UseReadmeCommand">/read README.md</button>
+            <button class="quick-action" @onclick="UseBuildCommand">/build</button>
+        </div>
+
         <div class="composer">
-            <input @bind="DraftMessage" @bind:event="oninput" placeholder="Напиши задачу или команду: /workspace, /files *.csproj, /read README.md, /build" />
+            <textarea @bind="DraftMessage" @bind:event="oninput" rows="2" placeholder="Напиши задачу или команду: /workspace, /files *.csproj, /read README.md, /build"></textarea>
             <button @onclick="SendMessageAsync" disabled="@(ActiveSession is null || IsBusy || string.IsNullOrWhiteSpace(DraftMessage))">
                 @(IsBusy ? "Думаю..." : "Отправить")
             </button>
@@ -241,6 +253,10 @@
     {
         WriteIndented = true
     };
+
+    private ElementReference ChatPanel { get; set; }
+
+    private bool ShouldScrollChat { get; set; }
 
     private AgentSession? ActiveSession { get; set; }
 
@@ -317,6 +333,19 @@
         ProjectFiles = await Workspace.FindFilesAsync(WorkspaceRoot, "*.csproj", 20);
         ToolDefinitions = Tools.List();
         SelectedToolName = ToolDefinitions.FirstOrDefault()?.Name ?? string.Empty;
+        ShouldScrollChat = true;
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!ShouldScrollChat)
+        {
+            return;
+        }
+
+        ShouldScrollChat = false;
+        await JS.InvokeVoidAsync("dinoAI.scrollChatToBottom", ChatPanel);
     }
 
     private void ToggleSettingsPanel()
@@ -413,6 +442,7 @@
     {
         ActiveSession = await Sessions.CreateAsync("Сессия DinoAI");
         DraftMessage = string.Empty;
+        ShouldScrollChat = true;
         await RefreshSessionsAsync();
     }
 
@@ -420,6 +450,20 @@
     {
         ActiveSession = await Sessions.GetAsync(sessionId);
         DraftMessage = string.Empty;
+        ShouldScrollChat = true;
+    }
+
+    private void UseWorkspaceCommand() => UseQuickCommand("/workspace");
+
+    private void UseFilesCommand() => UseQuickCommand("/files *.csproj");
+
+    private void UseReadmeCommand() => UseQuickCommand("/read README.md");
+
+    private void UseBuildCommand() => UseQuickCommand("/build");
+
+    private void UseQuickCommand(string command)
+    {
+        DraftMessage = command;
     }
 
     private async Task SendMessageAsync()
@@ -437,6 +481,7 @@
         {
             var result = await Agent.RunAsync(ActiveSession.Id, WorkspaceRoot, message);
             ActiveSession = result.Session;
+            ShouldScrollChat = true;
             await RefreshSessionsAsync();
         }
         finally
@@ -501,6 +546,65 @@
         }
 
         return arguments;
+    }
+
+    private static MarkupString RenderMessageContent(string content)
+    {
+        return new MarkupString(BuildMessageHtml(content));
+    }
+
+    private static string BuildMessageHtml(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return "<p></p>";
+        }
+
+        var builder = new StringBuilder();
+        var inCodeBlock = false;
+
+        foreach (var line in content.Split('\n'))
+        {
+            var normalizedLine = line.TrimEnd('\r');
+            if (normalizedLine.TrimStart().StartsWith("```", StringComparison.Ordinal))
+            {
+                builder.Append(inCodeBlock ? "</code></pre>" : "<pre><code>");
+                inCodeBlock = !inCodeBlock;
+                continue;
+            }
+
+            if (inCodeBlock)
+            {
+                builder.Append(WebUtility.HtmlEncode(normalizedLine));
+                builder.Append('\n');
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(normalizedLine))
+            {
+                builder.Append("<br />");
+                continue;
+            }
+
+            builder.Append("<p>");
+            builder.Append(FormatInlineMarkdown(normalizedLine));
+            builder.Append("</p>");
+        }
+
+        if (inCodeBlock)
+        {
+            builder.Append("</code></pre>");
+        }
+
+        return builder.ToString();
+    }
+
+    private static string FormatInlineMarkdown(string line)
+    {
+        var encoded = WebUtility.HtmlEncode(line);
+        encoded = Regex.Replace(encoded, @"`([^`]+)`", "<code>$1</code>");
+        encoded = Regex.Replace(encoded, @"\*\*([^*]+)\*\*", "<strong>$1</strong>");
+        return encoded;
     }
 
     private static string GetSessionTitle(AgentSession session)
