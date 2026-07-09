@@ -8,9 +8,12 @@ public interface IAgentSessionStore
 
     Task<AgentSession?> GetAsync(Guid sessionId, CancellationToken cancellationToken = default);
 
+    Task<bool> DeleteAsync(Guid sessionId, CancellationToken cancellationToken = default);
+
     Task<AgentSession> AddMessageAsync(
         Guid sessionId,
         AgentMessageRole role,
         string content,
         CancellationToken cancellationToken = default);
 }
+

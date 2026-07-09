@@ -182,11 +182,3 @@ public sealed record AddMessageRequest(AgentMessageRole Role, string Content);
 public sealed record RunTurnRequest(string? WorkspaceRoot, string Content);
 
 public sealed record ExecuteToolRequest(string? WorkspaceRoot, Dictionary<string, string?>? Arguments, bool IsUserApproved = false);
-
-
-
-
-
-
-
-

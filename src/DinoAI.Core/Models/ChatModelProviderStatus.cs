@@ -1,5 +1,12 @@
 ﻿namespace DinoAI.Core.Models;
 
+/// <summary>
+/// Чат-модель провайдера статуса, которая содержит информацию о том, настроен ли провайдер, его имя, модель и причину, если он не настроен.
+/// </summary>
+/// <param name="ProviderName"></param>
+/// <param name="IsConfigured"></param>
+/// <param name="Model"></param>
+/// <param name="Reason"></param>
 public sealed record ChatModelProviderStatus(
     string ProviderName,
     bool IsConfigured,

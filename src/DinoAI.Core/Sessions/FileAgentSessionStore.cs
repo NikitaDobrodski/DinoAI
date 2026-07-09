@@ -76,6 +76,26 @@ public sealed class FileAgentSessionStore : IAgentSessionStore
         }
     }
 
+    public async Task<bool> DeleteAsync(Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var state = await LoadAsync(cancellationToken);
+            var removed = state.Sessions.RemoveAll(session => session.Id == sessionId) > 0;
+            if (removed)
+            {
+                await SaveAsync(state, cancellationToken);
+            }
+
+            return removed;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task<AgentSession> AddMessageAsync(
         Guid sessionId,
         AgentMessageRole role,
@@ -152,3 +172,4 @@ public sealed class FileAgentSessionStore : IAgentSessionStore
         public List<AgentSession> Sessions { get; set; } = [];
     }
 }
+

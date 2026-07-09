@@ -62,7 +62,20 @@ http://127.0.0.1:5088/
 
 ```text
 Базовый адрес: https://api.groq.com/openai/v1
-Модель: llama-3.1-8b-instant
+Модель: qwen/qwen3-32b
+```
+
+Быстрая настройка Groq через CLI:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- model groq apiKey=<твой_groq_api_key>
+```
+
+Можно не передавать ключ в команду, если он уже есть в окружении:
+
+```powershell
+$env:GROQ_API_KEY="<твой_groq_api_key>"
+dotnet run --project src/DinoAI.Cli -- model groq
 ```
 
 Пример для OpenRouter:
@@ -105,6 +118,7 @@ http://127.0.0.1:5088/
 ```
 
 Если сообщение не похоже на локальную команду, DinoAI отправляет его в настроенную модель.
+Если модель поддерживает function calling, DinoAI передаёт ей доступные workspace/shell tools, выполняет запрошенные tool calls локально и возвращает результат модели для финального ответа.
 
 ## Инструменты агента
 
@@ -128,6 +142,49 @@ http://127.0.0.1:5088/
 Остальные команды требуют явного подтверждения.
 
 ## CLI-примеры
+
+Интерактивный терминальный вход:
+
+```powershell
+.\dino.ps1
+```
+
+В CMD можно запускать так:
+
+```cmd
+dino
+dino /workspace
+dino "посмотри проект"
+```
+
+Если CMD уже был открыт до настройки PATH, закрой его и открой заново.
+
+Чтобы запускать DinoAI как `dino` из любого нового PowerShell, добавь функцию в профиль:
+
+```powershell
+if (!(Test-Path $PROFILE)) { New-Item -ItemType File -Force -Path $PROFILE | Out-Null }
+Add-Content $PROFILE 'function dino { & "D:\DinoAI\dino.ps1" @args }'
+```
+
+После этого открой новый PowerShell:
+
+```powershell
+dino
+dino /workspace
+dino "посмотри проект и скажи, какие файлы открыть первыми"
+```
+
+Внутри интерактивного режима доступны локальные команды без расхода токенов Groq:
+
+```text
+/help
+/models
+/workspace
+/files *.cs
+/read README.md
+/clear
+/exit
+```
 
 Показать рабочую папку:
 
@@ -157,6 +214,18 @@ dotnet run --project src/DinoAI.Cli -- ask D:\DinoAI /workspace
 
 ```powershell
 dotnet run --project src/DinoAI.Cli -- tools
+```
+
+Проверить текущую модель:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- model status
+```
+
+Сохранить настройки Groq:
+
+```powershell
+dotnet run --project src/DinoAI.Cli -- model groq apiKey=<твой_groq_api_key>
 ```
 
 Запустить инструмент вручную:

@@ -11,6 +11,10 @@ public sealed class LocalAgentRunner(
     IAgentToolRegistry tools,
     IChatModelProvider modelProvider) : IAgentRunner
 {
+
+    /// <summary>
+    /// Агент выполняет один turn: получает сообщение от пользователя, планирует вызовы инструментов, выполняет их и формирует ответ ассистента.
+    /// </summary>
     public async Task<AgentTurnResult> RunAsync(
         Guid sessionId,
         string workspaceRoot,
@@ -28,7 +32,7 @@ public sealed class LocalAgentRunner(
 
         if (plans.Count == 0)
         {
-            session = await CompleteWithModelAsync(sessionId, session, cancellationToken);
+            session = await CompleteWithModelAsync(sessionId, workspaceRoot, userMessage, session, calls, cancellationToken);
 
             return new AgentTurnResult(session, calls);
         }
@@ -57,9 +61,16 @@ public sealed class LocalAgentRunner(
         return new AgentTurnResult(session, calls);
     }
 
+    /// <summary>
+    /// Агент формирует ответ ассистента с помощью внешней модели, если она настроена. 
+    /// Если модель не настроена, возвращается сообщение о том, что модель недоступна.
+    /// </summary>
     private async Task<AgentSession> CompleteWithModelAsync(
         Guid sessionId,
+        string workspaceRoot,
+        string userMessage,
         AgentSession session,
+        List<AgentToolCall> calls,
         CancellationToken cancellationToken)
     {
         var status = modelProvider.GetStatus();
@@ -76,28 +87,115 @@ public sealed class LocalAgentRunner(
         {
             var messages = session.Messages
                 .Where(message => message.Role is AgentMessageRole.User or AgentMessageRole.Assistant or AgentMessageRole.System)
-                .TakeLast(20)
+                .TakeLast(8)
                 .Select(message => new ChatModelMessage(ToModelRole(message.Role), message.Content))
                 .Prepend(new ChatModelMessage("system", BuildSystemPrompt(status)))
-                .ToArray();
+                .ToList();
 
-            var response = await modelProvider.CompleteAsync(new ChatModelRequest(messages), cancellationToken);
-            return await sessions.AddMessageAsync(sessionId, AgentMessageRole.Assistant, response.Content, cancellationToken);
+            for (var iteration = 0; iteration < 4; iteration++)
+            {
+                var response = await modelProvider.CompleteAsync(
+                    new ChatModelRequest(messages, Tools: GetModelTools(userMessage)),
+                    cancellationToken);
+
+                if (!response.HasToolCalls)
+                {
+                    var content = string.IsNullOrWhiteSpace(response.Content)
+                        ? "Модель завершила ответ без текста."
+                        : response.Content;
+
+                    return await sessions.AddMessageAsync(sessionId, AgentMessageRole.Assistant, content, cancellationToken);
+                }
+
+                messages.Add(new ChatModelMessage("assistant", response.Content, response.ToolCalls));
+
+                foreach (var toolCall in response.ToolCalls ?? [])
+                {
+                    var result = await tools.ExecuteAsync(
+                        toolCall.Name,
+                        new AgentToolContext(workspaceRoot, toolCall.Arguments),
+                        cancellationToken);
+
+                    calls.Add(new AgentToolCall(toolCall.Name, toolCall.Arguments, result));
+                    session = await sessions.AddMessageAsync(
+                        sessionId,
+                        AgentMessageRole.Tool,
+                        FormatToolMessage(toolCall.Name, result),
+                        cancellationToken);
+
+                    messages.Add(new ChatModelMessage(
+                        "tool",
+                        FormatToolResultForModel(toolCall.Name, result),
+                        ToolCallId: toolCall.Id,
+                        Name: toolCall.Name));
+                }
+            }
+
+            return await sessions.AddMessageAsync(
+                sessionId,
+                AgentMessageRole.Assistant,
+                "Модель несколько раз запрашивала инструменты подряд. Я остановил цикл, чтобы не выполнять лишние действия.",
+                cancellationToken);
         }
         catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TaskCanceledException)
         {
             return await sessions.AddMessageAsync(
                 sessionId,
                 AgentMessageRole.Assistant,
-                $"Запрос к модели не удался: {ex.Message}",
+                FormatModelFailure(ex),
                 cancellationToken);
         }
     }
 
+    private static string FormatModelFailure(Exception ex)
+    {
+        var message = ex.Message;
+        if (message.Contains("rate limit", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("tokens per minute", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("429", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("превышен лимит", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Groq временно упёрся в лимит токенов. Подожди примерно 30 секунд и повтори запрос. Я уже сократил историю и буду чаще использовать локальные workspace-команды, чтобы меньше жечь лимит.";
+        }
+
+        return $"Запрос к модели не удался: {message}";
+    }
+
+    /// <summary>
+    /// Чат системное сообщение, которое сообщает пользователю, что DinoAI использует внешнюю модель с определённым Model ID. 
+    /// Если модель не указана, используется "неизвестная модель". Сообщение также содержит инструкции по безопасному использованию инструментов workspace.
+    /// </summary>
+    /// <param name="status"></param>
+    /// <returns></returns>
     private static string BuildSystemPrompt(ChatModelProviderStatus status)
     {
         var modelName = string.IsNullOrWhiteSpace(status.Model) ? "неизвестная модель" : status.Model;
-        return $"Ты DinoAI, локальный C# agent-интерфейс для разработки. Твои ответы генерирует внешняя OpenAI-compatible модель с текущим Model ID: {modelName}. Если пользователь спрашивает, какая модель используется, называй именно этот Model ID и не утверждай, что работаешь на локально развернутой LLM, если это не указано в Model ID. Отвечай кратко и практично. Если нужен доступ к файлам или shell, предлагай безопасные команды workspace-инструментов.";
+        return $"Ты DinoAI, локальный C# agent-интерфейс для разработки. Твои ответы генерирует внешняя OpenAI-compatible модель с текущим Model ID: {modelName}. Если пользователь спрашивает, какая модель используется, называй именно этот Model ID. Отвечай кратко и практично. Для просмотра workspace используй workspace tools. Shell не используй для просмотра файлов: shell нужен только для явных команд build/test/git/status/diff или когда пользователь прямо просит выполнить shell-команду.";
+    }
+
+    private IReadOnlyList<AgentToolDefinition> GetModelTools(string userMessage)
+    {
+        var allowShell = ShouldExposeShellTool(userMessage);
+        return tools.List()
+            .Where(tool => allowShell || !tool.Name.Equals("shell.run", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
+    private static bool ShouldExposeShellTool(string userMessage)
+    {
+        var lower = userMessage.ToLowerInvariant();
+        return lower.Contains("shell", StringComparison.Ordinal)
+            || lower.Contains("терминал", StringComparison.Ordinal)
+            || lower.Contains("команд", StringComparison.Ordinal)
+            || lower.Contains("build", StringComparison.Ordinal)
+            || lower.Contains("test", StringComparison.Ordinal)
+            || lower.Contains("status", StringComparison.Ordinal)
+            || lower.Contains("diff", StringComparison.Ordinal)
+            || lower.Contains("git", StringComparison.Ordinal)
+            || lower.StartsWith("/build", StringComparison.Ordinal)
+            || lower.StartsWith("/test", StringComparison.Ordinal)
+            || lower.StartsWith("/status", StringComparison.Ordinal)
+            || lower.StartsWith("/diff", StringComparison.Ordinal);
     }
     private static string ToModelRole(AgentMessageRole role)
     {
@@ -110,10 +208,21 @@ public sealed class LocalAgentRunner(
         };
     }
 
+    /// <summary>
+    /// Планирование вызовов инструментов на основе сообщения пользователя. 
+    /// Если сообщение содержит ключевые слова, такие как "build", "test", "status", "diff", "workspace", "files", "read", то возвращается соответствующий план вызова инструмента.
+    /// </summary>
+    /// <param name="userMessage"></param>
+    /// <returns></returns>
     private static IReadOnlyList<ToolPlan> Plan(string userMessage)
     {
         var trimmed = userMessage.Trim();
         var lower = trimmed.ToLowerInvariant();
+
+        if (lower is "/help" or "/commands" or "/")
+        {
+            return [new ToolPlan("workspace.describe", new Dictionary<string, string?>())];
+        }
 
         if (lower is "/build" or "build")
         {
@@ -152,6 +261,15 @@ public sealed class LocalAgentRunner(
         if (lower is "/workspace" or "workspace")
         {
             return [new ToolPlan("workspace.describe", new Dictionary<string, string?>())];
+        }
+
+        if (lower is "все" or "всё" or "all" or "/all")
+        {
+            return [new ToolPlan("workspace.find_files", new Dictionary<string, string?>
+            {
+                ["pattern"] = "*",
+                ["maxResults"] = "200"
+            })];
         }
 
         if (lower.StartsWith("/files", StringComparison.Ordinal))
@@ -211,6 +329,13 @@ public sealed class LocalAgentRunner(
         return [];
     }
 
+    /// <summary>
+    /// Формат сообщения инструмента для добавления в сессию. Если инструмент завершился с ошибкой, возвращается сообщение об ошибке. 
+    /// Если инструмент завершился успешно, возвращается краткое описание результата в зависимости от типа данных, возвращаемых инструментом.
+    /// </summary>
+    /// <param name="toolName"></param>
+    /// <param name="result"></param>
+    /// <returns></returns>
     private static string FormatToolMessage(string toolName, AgentToolResult result)
     {
         if (!result.IsSuccess)
@@ -229,6 +354,12 @@ public sealed class LocalAgentRunner(
         };
     }
 
+    /// <summary>
+    /// Форматирование сообщения ассистента на основе успешных вызовов инструментов. 
+    /// Если ни один инструмент не завершился успешно, возвращается сообщение о том, что все вызовы завершились ошибкой.
+    /// </summary>
+    /// <param name="calls"></param>
+    /// <returns></returns>
     private static string FormatAssistantMessage(IReadOnlyList<AgentToolCall> calls)
     {
         var successfulCalls = calls.Where(call => call.Result.IsSuccess).ToArray();
@@ -249,6 +380,12 @@ public sealed class LocalAgentRunner(
         };
     }
 
+    /// <summary>
+    /// Форматирование информации о workspace для сообщения ассистента. 
+    /// Если в workspace нет top-level директорий или файлов, возвращается соответствующее сообщение.
+    /// </summary>
+    /// <param name="info"></param>
+    /// <returns></returns>
     private static string FormatWorkspaceInfo(WorkspaceInfo info)
     {
         var directories = info.TopLevelDirectories.Count == 0
@@ -261,7 +398,12 @@ public sealed class LocalAgentRunner(
 
         return $"Workspace {info.RootPath} contains {directories}. Top-level files: {files}.";
     }
-
+    /// <summary>
+    /// Форматирование списка файлов для сообщения ассистента. 
+    /// Если список пуст, возвращается сообщение о том, что подходящих файлов не найдено.
+    /// </summary>
+    /// <param name="files"></param>
+    /// <returns></returns>
     private static string FormatFiles(IReadOnlyList<WorkspaceFile> files)
     {
         if (files.Count == 0)
@@ -274,6 +416,11 @@ public sealed class LocalAgentRunner(
         return $"I found {files.Count} matching file(s):{Environment.NewLine}{preview}{suffix}";
     }
 
+    /// <summary>
+    /// Формирование результата выполнения shell-команды для сообщения ассистента.
+    /// </summary>
+    /// <param name="result"></param>
+    /// <returns></returns>
     private static string FormatShellResult(ShellCommandResult result)
     {
         var output = string.IsNullOrWhiteSpace(result.StandardOutput)
@@ -289,6 +436,24 @@ public sealed class LocalAgentRunner(
     {
         var suffix = file.WasTruncated ? Environment.NewLine + "[truncated]" : string.Empty;
         return $"Here is {file.RelativePath}:{Environment.NewLine}{file.Content}{suffix}";
+    }
+
+    private static string FormatToolResultForModel(string toolName, AgentToolResult result)
+    {
+        if (!result.IsSuccess)
+        {
+            return $"{toolName} failed: {result.Error}";
+        }
+
+        return result.Data switch
+        {
+            WorkspaceInfo info => FormatWorkspaceInfo(info),
+            IReadOnlyList<WorkspaceFile> files => FormatFiles(files),
+            WorkspaceFileContent file => FormatFileContent(file),
+            WorkspaceWriteResult write => $"Wrote {write.RelativePath} ({write.SizeBytes} bytes). Created: {write.WasCreated}. Overwritten: {write.WasOverwritten}.",
+            ShellCommandResult shell => FormatShellResult(shell),
+            _ => $"{toolName} completed."
+        };
     }
 
     private sealed record ToolPlan(string ToolName, IReadOnlyDictionary<string, string?> Arguments);

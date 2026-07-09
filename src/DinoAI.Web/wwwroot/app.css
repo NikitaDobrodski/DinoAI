@@ -135,6 +135,13 @@ textarea {
     padding-right: .15rem;
 }
 
+.session-row {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .45rem;
+}
+
 .session-tab {
     color: var(--text);
     cursor: pointer;
@@ -158,6 +165,26 @@ textarea {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.delete-session {
+    align-self: start;
+    background: rgba(255, 107, 134, .08);
+    border: 1px solid rgba(255, 107, 134, .24);
+    border-radius: 8px;
+    color: #ff9aab;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-weight: 900;
+    height: 2rem;
+    line-height: 1;
+    width: 2rem;
+}
+
+.delete-session:hover {
+    background: rgba(255, 107, 134, .16);
+    border-color: rgba(255, 107, 134, .42);
+    color: #ffd0d8;
 }
 
 .dino-shell {
@@ -725,3 +752,4 @@ code {
         justify-content: stretch;
     }
 }
+

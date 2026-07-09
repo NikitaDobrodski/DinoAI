@@ -34,6 +34,11 @@ public sealed class InMemoryAgentSessionStore : IAgentSessionStore
         return Task.FromResult(_sessions.TryGetValue(sessionId, out var session) ? ToSnapshot(session) : null);
     }
 
+    public Task<bool> DeleteAsync(Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(_sessions.TryRemove(sessionId, out _));
+    }
+
     public Task<AgentSession> AddMessageAsync(
         Guid sessionId,
         AgentMessageRole role,
@@ -84,3 +89,4 @@ public sealed class InMemoryAgentSessionStore : IAgentSessionStore
         public List<AgentMessage> Messages { get; } = [];
     }
 }
+
